@@ -19,7 +19,7 @@ class SecurityConfig {
 
     /**
      * 관리 API는 세션 없이 액세스 토큰(JWT)으로만 호출한다.
-     * 토큰의 roles 클레임이 ROLE_ 권한으로 변환되어 ADMIN만 /api/admin/** 에 접근할 수 있다.
+     * 토큰의 roles 클레임이 ROLE_ 권한으로 변환되어 ADMIN만 관리자 API(/api/admin 하위 경로)에 접근할 수 있다.
      */
     @Bean
     @Order(2)

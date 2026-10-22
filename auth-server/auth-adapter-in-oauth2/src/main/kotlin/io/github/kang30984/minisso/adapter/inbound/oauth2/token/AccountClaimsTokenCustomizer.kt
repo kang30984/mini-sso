@@ -3,7 +3,7 @@ package io.github.kang30984.minisso.adapter.inbound.oauth2.token
 import io.github.kang30984.minisso.adapter.inbound.oauth2.authentication.MiniSsoPrincipal
 import io.github.kang30984.minisso.application.account.port.inbound.GetAccountQuery
 import org.springframework.security.core.Authentication
-import org.springframework.security.oauth2.core.OAuth2TokenType
+import org.springframework.security.oauth2.server.authorization.OAuth2TokenType
 import org.springframework.security.oauth2.core.oidc.OidcScopes
 import org.springframework.security.oauth2.core.oidc.endpoint.OidcParameterNames
 import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext
