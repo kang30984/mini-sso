@@ -1,0 +1,64 @@
+# DESIGN.md 12장. 1주차에는 build / test / package 단계만 구성하고
+# quality(japicmp)와 publish-sdk(GitLab Package Registry)는 5주차에 추가한다.
+image: eclipse-temurin:21-jdk
+
+variables:
+  GRADLE_USER_HOME: "$CI_PROJECT_DIR/.gradle"
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false"
+
+cache:
+  key:
+    files:
+      - gradle/libs.versions.toml
+      - gradle/wrapper/gradle-wrapper.properties
+  paths:
+    - .gradle/caches
+    - .gradle/wrapper
+
+stages:
+  - build
+  - test
+  - package
+
+build:
+  stage: build
+  script:
+    - ./gradlew assemble
+
+unit-test:
+  stage: test
+  script:
+    - ./gradlew test
+  artifacts:
+    when: always
+    reports:
+      junit: "**/build/test-results/test/**/TEST-*.xml"
+
+integration-test:
+  stage: test
+  # Testcontainers가 Docker를 사용할 수 있도록 Docker-in-Docker 구성
+  services:
+    - name: docker:27-dind
+      alias: docker
+      command: ["--tls=false"]
+  variables:
+    DOCKER_HOST: "tcp://docker:2375"
+    DOCKER_TLS_CERTDIR: ""
+    TESTCONTAINERS_HOST_OVERRIDE: "docker"
+  script:
+    - ./gradlew integrationTest
+  artifacts:
+    when: always
+    reports:
+      junit: "**/build/test-results/integrationTest/**/TEST-*.xml"
+
+boot-jar:
+  stage: package
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  script:
+    - ./gradlew :auth-server:auth-bootstrap:bootJar
+  artifacts:
+    paths:
+      - auth-server/auth-bootstrap/build/libs/*.jar
+    expire_in: 7 days

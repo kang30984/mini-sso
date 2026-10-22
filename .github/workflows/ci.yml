@@ -1,0 +1,19 @@
+# GitHub에서도 커밋마다 빌드 결과를 확인하기 위한 워크플로 (주 파이프라인은 .gitlab-ci.yml)
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+      - run: ./gradlew build

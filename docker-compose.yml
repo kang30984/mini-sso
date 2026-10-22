@@ -1,0 +1,28 @@
+# 로컬 개발용 인프라. 인증 서버는 IDE 또는 ./gradlew :auth-server:auth-bootstrap:bootRun 으로 실행
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: minisso-mysql
+    environment:
+      MYSQL_DATABASE: ${DB_NAME:-minisso}
+      MYSQL_USER: ${DB_USERNAME:-minisso}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-minisso-local}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root-local}
+      TZ: Asia/Seoul
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: minisso-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
