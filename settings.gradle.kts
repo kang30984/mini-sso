@@ -19,6 +19,7 @@ include(
     ":auth-server:auth-adapter-out-persistence",
     ":auth-server:auth-adapter-out-redis",
     ":auth-server:auth-adapter-out-notifier",
+    ":auth-server:auth-adapter-out-security",
     ":auth-server:auth-bootstrap",
     ":auth-sdk:auth-sdk-core",
     ":auth-sdk:auth-sdk-spring-boot-starter",

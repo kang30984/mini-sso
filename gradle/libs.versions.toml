@@ -2,6 +2,8 @@
 kotlin = "2.1.21"
 spring-boot = "3.5.6"
 archunit = "1.3.0"
+querydsl = "5.1.0"
+bouncycastle = "1.80"
 
 [libraries]
 # build-logic 전용 (Gradle 플러그인)
@@ -12,3 +14,6 @@ spring-boot-gradle-plugin = { module = "org.springframework.boot:spring-boot-gra
 
 # 애플리케이션 (Spring Boot BOM이 관리하지 않는 것만 버전 명시)
 archunit-junit5 = { module = "com.tngtech.archunit:archunit-junit5", version.ref = "archunit" }
+querydsl-jpa = { module = "com.querydsl:querydsl-jpa", version.ref = "querydsl" }
+querydsl-apt = { module = "com.querydsl:querydsl-apt", version.ref = "querydsl" }
+bouncycastle-bcprov = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bouncycastle" }

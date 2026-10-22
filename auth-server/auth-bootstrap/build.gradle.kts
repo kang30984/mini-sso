@@ -9,6 +9,7 @@ dependencies {
     implementation(project(":auth-server:auth-adapter-out-persistence"))
     implementation(project(":auth-server:auth-adapter-out-redis"))
     implementation(project(":auth-server:auth-adapter-out-notifier"))
+    implementation(project(":auth-server:auth-adapter-out-security"))
 
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     runtimeOnly("com.mysql:mysql-connector-j")
@@ -21,9 +22,6 @@ testing {
     suites {
         named<JvmTestSuite>("integrationTest") {
             dependencies {
-                implementation("org.springframework.boot:spring-boot-starter-test")
-                implementation("org.springframework.boot:spring-boot-testcontainers")
-                implementation("org.testcontainers:junit-jupiter")
                 implementation("org.testcontainers:mysql")
             }
         }

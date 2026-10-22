@@ -82,6 +82,7 @@ mini-sso/
 │   ├── auth-adapter-out-persistence/ # JPA, QueryDSL
 │   ├── auth-adapter-out-redis/       # SSO 세션, 인가 상태, Rate Limit
 │   ├── auth-adapter-out-notifier/    # Back-Channel Logout 발송
+│   ├── auth-adapter-out-security/    # Argon2id 비밀번호 해시
 │   └── auth-bootstrap/               # main, 빈 조립, 설정 파일
 ├── auth-sdk/
 │   ├── auth-sdk-core/                # Java 21, 순수 JWT 검증 (Spring 의존 없음)
@@ -104,11 +105,13 @@ flowchart TD
     boot --> jpa[adapter-out-persistence]
     boot --> redis[adapter-out-redis]
     boot --> noti[adapter-out-notifier]
+    boot --> sec[adapter-out-security]
     web --> app[auth-application]
     oauth --> app
     jpa --> app
     redis --> app
     noti --> app
+    sec --> app
     app --> dom[auth-domain]
 ```
 
@@ -156,7 +159,7 @@ io.github.kang30984.minisso.application
 | `loginId` | 사번 형식 로그인 ID (유니크) |
 | `email`, `name`, `department` | ID Token / UserInfo 클레임 원천 |
 | `passwordHash` | Argon2id 해시 |
-| `status` | `ACTIVE`, `LOCKED`, `DORMANT`, `WITHDRAWN` |
+| `status` | `ACTIVE`, `DORMANT`, `WITHDRAWN` (잠금은 시간이 지나면 풀리는 일시 상태라 `lockedUntil`로 표현) |
 | `failedLoginCount`, `lockedUntil` | 잠금 정책 상태 |
 | `passwordChangedAt`, `lastLoginAt` | 비밀번호 만료·휴면 판단 |
 
@@ -362,11 +365,12 @@ SAS는 RP-Initiated Logout을 제공한다. Back-Channel Logout 토큰 발송은
 
 | 메서드 | 경로 | 권한 | 설명 |
 |---|---|---|---|
-| POST | `/api/v1/accounts` | 관리자 | 계정 생성 (임직원 등록) |
+| POST | `/api/admin/v1/accounts` | 관리자 | 계정 생성 (임직원 등록) |
+| GET | `/api/admin/v1/accounts/{id}` | 관리자 | 계정 조회 (잠금 여부 포함) |
 | GET | `/api/v1/accounts/me` | 본인 | 내 정보 |
 | PATCH | `/api/v1/accounts/me/password` | 본인 | 비밀번호 변경 (현재 비밀번호 확인) |
 | POST | `/api/admin/v1/accounts/{id}/unlock` | 관리자 | 잠금 해제 |
-| GET | `/api/admin/v1/login-histories` | 관리자 | 이력 검색 (QueryDSL) |
+| GET | `/api/admin/v1/login-histories` | 관리자 | 이력 검색 (QueryDSL, 커서 페이징) |
 | GET | `/api/admin/v1/accounts/{id}/sessions` | 관리자 | 활성 SSO 세션 목록 |
 | DELETE | `/api/admin/v1/sessions/{sid}` | 관리자 | 강제 로그아웃 |
 | POST | `/api/admin/v1/signing-keys/rotate` | 관리자 | 서명키 로테이션 |
@@ -525,5 +529,6 @@ publish-sdk:  태그(v*) 푸시 시에만 SDK를 GitLab Package Registry에 배�
 - ADR-006 application 계층에 `@Transactional` 허용 (순수성과 실용성의 타협)
 - ADR-007 Refresh Token 재사용 탐지 시 계보 전체 폐기
 - ADR-008 서명키 로테이션 시 이전 키 게시 기간 결정
+- ADR-009 로그인 이력 테이블에 계정 FK를 두지 않음
 
 각 ADR은 배경, 선택지, 결정, 결과(트레이드오프) 형식으로 작성한다. 면접에서 "왜 그렇게 했는지"를 설명할 근거가 된다.

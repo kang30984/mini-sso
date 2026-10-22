@@ -11,11 +11,23 @@ spring:
   jpa:
     open-in-view: false
     hibernate:
-      ddl-auto: validate
+      ddl-auto: validate          # 스키마는 Flyway가 관리하고, Hibernate는 엔티티와 일치하는지만 검증
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+        type:
+          preferred_instant_jdbc_type: TIMESTAMP
   data:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+
+minisso:
+  account:
+    max-failed-attempts: 5
+    lock-duration: 30m
+    password-max-age: 90d
 
 management:
   endpoints:

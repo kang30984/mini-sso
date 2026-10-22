@@ -35,11 +35,13 @@ flowchart TD
     boot --> jpa[adapter-out-persistence]
     boot --> redis[adapter-out-redis]
     boot --> noti[adapter-out-notifier]
+    boot --> sec[adapter-out-security]
     web --> app[auth-application]
     oauth --> app
     jpa --> app
     redis --> app
     noti --> app
+    sec --> app
     app --> dom[auth-domain]
 ```
 
@@ -52,6 +54,7 @@ flowchart TD
 | `auth-adapter-out-persistence` | JPA / QueryDSL |
 | `auth-adapter-out-redis` | SSO 세션, 인가 상태, Rate Limit |
 | `auth-adapter-out-notifier` | Back-Channel Logout 발송 |
+| `auth-adapter-out-security` | Argon2id 비밀번호 해시 |
 | `auth-bootstrap` | 실행 진입점, 빈 조립, 아키텍처 테스트 |
 | `auth-sdk-core` | Spring 의존 없는 JWT 검증 |
 | `auth-sdk-spring-boot-starter` | AutoConfiguration 기반 SDK |
@@ -77,11 +80,52 @@ docker compose up -d                                  # MySQL, Redis
 ## 로드맵
 
 - [x] 1주차: 멀티모듈 골격, Convention Plugin, docker-compose, CI, 아키텍처 테스트
-- [ ] 2주차: 계정 도메인, JPA/QueryDSL 어댑터, 계정 API
+- [x] 2주차: 계정 도메인, JPA/QueryDSL 어댑터, 계정 API
 - [ ] 3주차: Spring Authorization Server 연동, Authorization Code + PKCE, OIDC
 - [ ] 4주차: Redis SSO 세션, Refresh Token 회전·재사용 탐지, 로그아웃
 - [ ] 5주차: SDK core·starter, 서명키 로테이션, 샘플 앱 2개
 - [ ] 6주차: k6 부하 테스트와 성능 개선, 문서 정리
+
+## 구현 하이라이트
+
+**계정 잠금 정책 (도메인 규칙)**
+- 5회 연속 실패 시 30분 잠금. 잠긴 동안에는 비밀번호 비교 자체를 하지 않아 무차별 대입을 차단
+- 잠금 시 실패 횟수를 초기화해, 잠금이 풀린 뒤 한 번의 실수로 바로 재잠금되지 않음
+- 정책 값은 `minisso.account.*` 설정으로 조정
+
+**계정 존재 여부 노출 방지**
+- 존재하지 않는 계정에도 실제 Argon2 해시 비교를 수행해 응답 시간 차이를 줄임
+- 실패 사유는 감사 이력에만 남기고, 사용자 메시지는 통일 (3주차 로그인 화면)
+
+**실패도 커밋되는 로그인**
+- 로그인 실패를 예외가 아닌 결과값으로 반환. 예외로 처리하면 트랜잭션 롤백으로 실패 횟수와 이력이 사라지기 때문
+
+**영속성**
+- 도메인 모델과 JPA 엔티티 분리, 스키마는 Flyway로 관리하고 Hibernate는 `validate`만 수행
+- 로그인 이력 검색은 QueryDSL 동적 조건 + No-Offset 커서 페이징, 조회 기간 최대 31일 강제
+- 동시 가입 시 유니크 제약 위반을 도메인 에러 코드로 변환, 계정 수정은 `@Version` 낙관적 락
+
+**API**
+- 오류 응답은 RFC 9457 ProblemDetail + 자체 코드 ([에러 코드 목록](docs/error-codes.md))
+- 비밀번호가 담긴 요청·커맨드 객체는 `toString`에서 마스킹
+
+## API 예시
+
+```bash
+# 계정 생성
+curl -X POST localhost:9000/api/admin/v1/accounts -H 'Content-Type: application/json' -d '{
+  "loginId": "kim.cs", "email": "kim.cs@example.com",
+  "name": "김철수", "department": "보안팀", "initialPassword": "Sso-Passw0rd!"
+}'
+
+# 잠금 해제
+curl -X POST localhost:9000/api/admin/v1/accounts/1/unlock
+
+# 로그인 이력 검색 (다음 페이지는 응답의 nextCursor를 cursor로 전달)
+curl 'localhost:9000/api/admin/v1/login-histories?from=2026-10-01T00:00:00Z&to=2026-10-31T00:00:00Z&outcome=FAILURE&size=20'
+```
+
+> 관리자 API 인증은 3주차에 Spring Security와 함께 적용합니다.
 
 ## 성능 측정
 

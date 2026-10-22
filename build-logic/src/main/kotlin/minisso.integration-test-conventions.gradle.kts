@@ -12,7 +12,9 @@ testing {
             dependencies {
                 implementation(project())
                 implementation(platform(SpringBootPlugin.BOM_COORDINATES))
-                implementation("org.assertj:assertj-core")
+                implementation("org.springframework.boot:spring-boot-starter-test")
+                implementation("org.springframework.boot:spring-boot-testcontainers")
+                implementation("org.testcontainers:junit-jupiter")
             }
             targets.all {
                 testTask.configure {

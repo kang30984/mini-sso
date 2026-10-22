@@ -12,3 +12,4 @@
 | [006](006-transactional-in-application.md) | application 계층에 @Transactional 허용 | 승인 |
 | 007 | Refresh Token 재사용 탐지 시 계보 전체 폐기 | 4주차 작성 예정 |
 | 008 | 서명키 로테이션 시 이전 키 게시 기간 | 5주차 작성 예정 |
+| [009](009-login-history-without-fk.md) | 로그인 이력 테이블에 계정 FK를 두지 않음 | 승인 |
