@@ -22,6 +22,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import org.springframework.web.util.UriComponentsBuilder
+import java.net.URI
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Base64
@@ -75,13 +76,12 @@ class AuthorizationCodeFlowIT {
         val session = MockHttpSession()
 
         // 1. 로그인하지 않은 상태의 인가 요청은 로그인 페이지로 이동한다
-        mockMvc.get("/oauth2/authorize") {
+        mockMvc.get(authorizeUri(challenge = s256(verifier))) {
             this.session = session
             accept = MediaType.TEXT_HTML
-            authorizationParams(challenge = s256(verifier))
         }.andExpect {
             status { is3xxRedirection() }
-            redirectedUrl("http://localhost/login")
+            redirectedUrlPattern("**/login")
         }
 
         // 2. 로그인
@@ -128,16 +128,17 @@ class AuthorizationCodeFlowIT {
         val session = MockHttpSession()
         login(session, PASSWORD)
 
-        val response = mockMvc.get("/oauth2/authorize") {
+        val response = mockMvc.get(authorizeUri(challenge = null)) {
             this.session = session
             accept = MediaType.TEXT_HTML
-            authorizationParams(challenge = null)
         }.andReturn().response
         val location = response.redirectedUrl.orEmpty()
 
-        // 클라이언트로 error 파라미터와 함께 돌려보내거나(302) 오류 응답(400)을 준다. 어느 쪽이든 코드는 없어야 한다.
+        // redirect_uri는 유효하므로 클라이언트로 error=invalid_request를 돌려보내고, 코드는 발급하지 않는다
+        assertThat(response.status).isEqualTo(302)
+        assertThat(location).startsWith(REDIRECT_URI)
+        assertThat(location).contains("error=invalid_request")
         assertThat(location).doesNotContain("code=")
-        assertThat(location.contains("error=") || response.status == 400).isTrue()
     }
 
     @Test
@@ -145,10 +146,9 @@ class AuthorizationCodeFlowIT {
         val session = MockHttpSession()
         login(session, PASSWORD)
 
-        mockMvc.get("/oauth2/authorize") {
+        mockMvc.get(authorizeUri(challenge = s256(verifier), redirectUri = "http://127.0.0.1:9999/evil")) {
             this.session = session
             accept = MediaType.TEXT_HTML
-            authorizationParams(challenge = s256(verifier), redirectUri = "http://127.0.0.1:9999/evil")
         }.andExpect {
             status { isBadRequest() }
         }
@@ -171,10 +171,9 @@ class AuthorizationCodeFlowIT {
         }
 
     private fun authorize(session: MockHttpSession): String {
-        val location = mockMvc.get("/oauth2/authorize") {
+        val location = mockMvc.get(authorizeUri(challenge = s256(verifier))) {
             this.session = session
             accept = MediaType.TEXT_HTML
-            authorizationParams(challenge = s256(verifier))
         }.andExpect {
             status { is3xxRedirection() }
         }.andReturn().response.redirectedUrl.orEmpty()
@@ -194,20 +193,27 @@ class AuthorizationCodeFlowIT {
         return objectMapper.readTree(body)
     }
 
-    private fun MockHttpServletRequestDsl.authorizationParams(
-        challenge: String?,
-        redirectUri: String = REDIRECT_URI,
-    ) {
-        param("response_type", "code")
-        param("client_id", CLIENT_ID)
-        param("scope", "openid profile email")
-        param("redirect_uri", redirectUri)
-        param("state", STATE)
-        if (challenge != null) {
-            param("code_challenge", challenge)
-            param("code_challenge_method", "S256")
-        }
-    }
+    /**
+     * 인가 요청 파라미터는 반드시 쿼리 스트링에 담는다.
+     * Spring Authorization Server는 GET 인가 요청에서 쿼리 스트링에 있는 파라미터만 읽기 때문에,
+     * MockMvc의 param()으로 넣으면 파라미터가 없는 요청으로 처리되어 400이 된다.
+     */
+    private fun authorizeUri(challenge: String?, redirectUri: String = REDIRECT_URI): URI =
+        UriComponentsBuilder.fromPath("/oauth2/authorize")
+            .queryParam("response_type", "code")
+            .queryParam("client_id", CLIENT_ID)
+            .queryParam("scope", "openid profile email")
+            .queryParam("redirect_uri", redirectUri)
+            .queryParam("state", STATE)
+            .apply {
+                if (challenge != null) {
+                    queryParam("code_challenge", challenge)
+                    queryParam("code_challenge_method", "S256")
+                }
+            }
+            .encode()
+            .build()
+            .toUri()
 
     private fun MockHttpServletRequestDsl.tokenRequest(code: String, codeVerifier: String) {
         with(httpBasic(CLIENT_ID, CLIENT_SECRET))
