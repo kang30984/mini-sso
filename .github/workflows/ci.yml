@@ -16,4 +16,5 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@v5
-      - run: ./gradlew build
+      # --continue: 한 모듈이 실패해도 나머지 모듈을 계속 빌드해 모든 오류를 한 번에 확인
+      - run: ./gradlew build --continue
