@@ -18,7 +18,7 @@ class InMemoryOAuthClientRepository : LoadOAuthClientPort, SaveOAuthClientPort {
         val id = client.id ?: OAuthClientId(store.size + 1L)
         val saved = OAuthClient.reconstitute(
             id, client.clientId, client.clientName, client.clientSecretHash,
-            client.redirectUris, client.postLogoutRedirectUris, client.scopes,
+            client.redirectUris, client.postLogoutRedirectUris, client.scopes, client.backchannelLogoutUri,
         )
         store[id.value] = saved
         return saved

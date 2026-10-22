@@ -6,9 +6,11 @@ import com.nimbusds.jose.jwk.source.ImmutableJWKSet
 import com.nimbusds.jose.jwk.source.JWKSource
 import com.nimbusds.jose.proc.SecurityContext
 import io.github.kang30984.minisso.adapter.inbound.oauth2.client.RegisteredClientRepositoryAdapter
+import io.github.kang30984.minisso.adapter.inbound.oauth2.logout.SsoLogoutSuccessHandler
 import io.github.kang30984.minisso.adapter.inbound.oauth2.token.AccountClaimsTokenCustomizer
 import io.github.kang30984.minisso.application.account.port.inbound.GetAccountQuery
 import io.github.kang30984.minisso.application.client.port.inbound.GetOAuthClientQuery
+import io.github.kang30984.minisso.application.session.port.inbound.LogoutUseCase
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -17,6 +19,8 @@ import org.springframework.http.MediaType
 import org.springframework.security.config.Customizer
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.oauth2.jwt.JwtDecoder
+import org.springframework.security.oauth2.jwt.JwtEncoder
+import org.springframework.security.oauth2.jwt.NimbusJwtEncoder
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository
 import org.springframework.security.oauth2.server.authorization.config.annotation.web.configuration.OAuth2AuthorizationServerConfiguration
 import org.springframework.security.oauth2.server.authorization.config.annotation.web.configurers.OAuth2AuthorizationServerConfigurer
@@ -40,12 +44,17 @@ class AuthorizationServerConfig {
      */
     @Bean
     @Order(1)
-    fun authorizationServerSecurityFilterChain(http: HttpSecurity): SecurityFilterChain {
+    fun authorizationServerSecurityFilterChain(http: HttpSecurity, logoutUseCase: LogoutUseCase): SecurityFilterChain {
         val authorizationServerConfigurer = OAuth2AuthorizationServerConfigurer.authorizationServer()
+        val logoutSuccessHandler = SsoLogoutSuccessHandler(logoutUseCase)
 
         http
             .securityMatcher(authorizationServerConfigurer.endpointsMatcher)
-            .with(authorizationServerConfigurer) { it.oidc(Customizer.withDefaults()) }
+            .with(authorizationServerConfigurer) { server ->
+                server.oidc { oidc ->
+                    oidc.logoutEndpoint { it.logoutResponseHandler(logoutSuccessHandler) }
+                }
+            }
             .authorizeHttpRequests { it.anyRequest().authenticated() }
             .exceptionHandling {
                 it.defaultAuthenticationEntryPointFor(
@@ -80,6 +89,10 @@ class AuthorizationServerConfig {
             .build()
         return ImmutableJWKSet(JWKSet(rsaKey))
     }
+
+    /** 토큰 서명. 인가 서버의 토큰 발급과 Back-Channel Logout Token 서명이 같은 키를 쓴다. */
+    @Bean
+    fun jwtEncoder(jwkSource: JWKSource<SecurityContext>): JwtEncoder = NimbusJwtEncoder(jwkSource)
 
     /** 자기 자신이 발급한 토큰을 검증할 때 네트워크 호출 없이 같은 키를 사용한다 */
     @Bean

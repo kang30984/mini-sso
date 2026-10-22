@@ -35,6 +35,9 @@ class OAuthClientJpaEntity(
     @Convert(converter = SpaceDelimitedSetConverter::class)
     @Column(nullable = false, length = 500)
     var scopes: Set<String>,
+
+    @Column(length = 500)
+    var backchannelLogoutUri: String?,
 ) {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

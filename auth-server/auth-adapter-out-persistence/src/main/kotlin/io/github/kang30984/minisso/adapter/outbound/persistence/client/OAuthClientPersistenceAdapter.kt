@@ -33,6 +33,7 @@ class OAuthClientPersistenceAdapter(
                     redirectUris = client.redirectUris,
                     postLogoutRedirectUris = client.postLogoutRedirectUris,
                     scopes = client.scopes,
+                    backchannelLogoutUri = client.backchannelLogoutUri,
                 ),
             ).toDomain()
         } catch (e: DataIntegrityViolationException) {
@@ -48,5 +49,6 @@ class OAuthClientPersistenceAdapter(
         redirectUris = redirectUris,
         postLogoutRedirectUris = postLogoutRedirectUris,
         scopes = scopes,
+        backchannelLogoutUri = backchannelLogoutUri,
     )
 }

@@ -20,6 +20,8 @@ class OAuthClient private constructor(
     val redirectUris: Set<String>,
     val postLogoutRedirectUris: Set<String>,
     val scopes: Set<String>,
+    /** 로그아웃 시 Logout Token을 받을 주소. 없으면 Back-Channel Logout 대상에서 제외한다. */
+    val backchannelLogoutUri: String?,
 ) {
     companion object {
         private val CLIENT_ID_PATTERN = Regex("^[a-z][a-z0-9-]{2,49}$")
@@ -36,6 +38,7 @@ class OAuthClient private constructor(
             postLogoutRedirectUris: Set<String>,
             scopes: Set<String>,
             hasher: PasswordHasher,
+            backchannelLogoutUri: String? = null,
         ): OAuthClient {
             if (!CLIENT_ID_PATTERN.matches(clientId)) throw BusinessException(ErrorCode.INVALID_CLIENT_ID)
             val trimmedName = clientName.trim()
@@ -44,7 +47,7 @@ class OAuthClient private constructor(
             }
             if (rawSecret.length < MIN_SECRET_LENGTH) throw BusinessException(ErrorCode.INVALID_CLIENT_SECRET)
             if (redirectUris.isEmpty()) throw BusinessException(ErrorCode.INVALID_REDIRECT_URI)
-            (redirectUris + postLogoutRedirectUris).forEach(RedirectUriPolicy::validate)
+            (redirectUris + postLogoutRedirectUris + listOfNotNull(backchannelLogoutUri)).forEach(RedirectUriPolicy::validate)
             if (OPENID !in scopes || !SUPPORTED_SCOPES.containsAll(scopes)) throw BusinessException(ErrorCode.INVALID_SCOPE)
 
             return OAuthClient(
@@ -55,6 +58,7 @@ class OAuthClient private constructor(
                 redirectUris = redirectUris.toSet(),
                 postLogoutRedirectUris = postLogoutRedirectUris.toSet(),
                 scopes = scopes.toSet(),
+                backchannelLogoutUri = backchannelLogoutUri,
             )
         }
 
@@ -66,6 +70,9 @@ class OAuthClient private constructor(
             redirectUris: Set<String>,
             postLogoutRedirectUris: Set<String>,
             scopes: Set<String>,
-        ): OAuthClient = OAuthClient(id, clientId, clientName, clientSecretHash, redirectUris, postLogoutRedirectUris, scopes)
+            backchannelLogoutUri: String?,
+        ): OAuthClient = OAuthClient(
+            id, clientId, clientName, clientSecretHash, redirectUris, postLogoutRedirectUris, scopes, backchannelLogoutUri,
+        )
     }
 }

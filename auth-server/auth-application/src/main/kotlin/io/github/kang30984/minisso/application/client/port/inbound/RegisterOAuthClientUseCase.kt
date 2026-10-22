@@ -12,8 +12,10 @@ data class RegisterOAuthClientCommand(
     val redirectUris: Set<String>,
     val postLogoutRedirectUris: Set<String>,
     val scopes: Set<String>,
+    val backchannelLogoutUri: String? = null,
 ) {
     override fun toString(): String =
         "RegisterOAuthClientCommand(clientId=$clientId, clientName=$clientName, clientSecret=****, " +
-            "redirectUris=$redirectUris, postLogoutRedirectUris=$postLogoutRedirectUris, scopes=$scopes)"
+            "redirectUris=$redirectUris, postLogoutRedirectUris=$postLogoutRedirectUris, scopes=$scopes, " +
+            "backchannelLogoutUri=$backchannelLogoutUri)"
 }

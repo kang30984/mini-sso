@@ -262,13 +262,12 @@ erDiagram
 
 | 키 | 타입 | TTL | 용도 |
 |---|---|---|---|
-| `sso:session:{sid}` | Hash | 8시간 (절대 만료) | SSO 세션 본문 |
-| `sso:account:{accountId}:sessions` | Set | 세션과 동일 | 계정별 세션 목록 (강제 로그아웃용) |
-| `sso:session:{sid}:clients` | Set | 세션과 동일 | 로그아웃 통지 대상 클라이언트 |
-| `oauth2:authz:{id}` | String(JSON) | 토큰 최대 만료 | SAS 인가 상태 |
-| `oauth2:authz:idx:{type}:{sha256(token)}` | String | 토큰 만료 | 토큰 → 인가 ID 역색인 |
-| `oauth2:rt:family:{familyId}` | Set | 14일 | Refresh Token 계보 (재사용 탐지) |
-| `ratelimit:login:ip:{ip}` | String(INCR) | 1분 | 로그인 시도 제한 |
+| `minisso:session:sessions:{id}` | Hash | 마지막 요청 후 8시간 | 로그인(SSO) 세션 본문 (Spring Session) |
+| `minisso:authz:{id}` | String(JDK 직렬화) | 가장 늦게 만료되는 토큰 | 인가 상태 (`OAuth2Authorization`) |
+| `minisso:authz:idx:{type}:{sha256(token)}` | String | 해당 토큰 만료 | 토큰 → 인가 ID 역색인 (code, access, refresh, id_token, state) |
+| `minisso:authz:rotated:{sha256(token)}` | String | 이전 리프레시 토큰의 남은 수명 | 회전된 리프레시 토큰 (재사용 탐지, ADR-007) |
+| `minisso:sso:{sid}` | Set | 인가와 동일 | SSO 세션으로 발급된 인가 ID 목록 (로그아웃 시 일괄 폐기) |
+| `ratelimit:login:ip:{ip}` | String(INCR) | 1분 | 로그인 시도 제한 (6주차) |
 
 원칙
 - 토큰 원문은 저장하지 않고 SHA-256 해시를 키로 쓴다.

@@ -42,6 +42,7 @@ class BootstrapDataInitializer(
                     redirectUris = client.redirectUris,
                     postLogoutRedirectUris = client.postLogoutRedirectUris,
                     scopes = client.scopes,
+                    backchannelLogoutUri = client.backchannelLogoutUri,
                 ),
             )
             if (created) log.info("OAuth 클라이언트를 등록했습니다: {}", client.clientId)

@@ -29,6 +29,7 @@ class OAuthClientService(
             postLogoutRedirectUris = command.postLogoutRedirectUris,
             scopes = command.scopes,
             hasher = passwordHasher,
+            backchannelLogoutUri = command.backchannelLogoutUri,
         )
         saveOAuthClientPort.save(client)
         return true

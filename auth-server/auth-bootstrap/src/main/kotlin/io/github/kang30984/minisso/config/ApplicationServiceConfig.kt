@@ -11,6 +11,9 @@ import io.github.kang30984.minisso.application.client.service.OAuthClientService
 import io.github.kang30984.minisso.application.history.port.outbound.SaveLoginHistoryPort
 import io.github.kang30984.minisso.application.history.port.outbound.SearchLoginHistoryPort
 import io.github.kang30984.minisso.application.history.service.LoginHistoryQueryService
+import io.github.kang30984.minisso.application.session.port.outbound.BackChannelLogoutPort
+import io.github.kang30984.minisso.application.session.port.outbound.SsoSessionPort
+import io.github.kang30984.minisso.application.session.service.LogoutService
 import io.github.kang30984.minisso.domain.account.AccountPolicy
 import io.github.kang30984.minisso.domain.account.PasswordHasher
 import org.springframework.boot.context.properties.EnableConfigurationProperties
@@ -65,4 +68,11 @@ class ApplicationServiceConfig {
         saveOAuthClientPort: SaveOAuthClientPort,
         passwordHasher: PasswordHasher,
     ) = OAuthClientService(loadOAuthClientPort, saveOAuthClientPort, passwordHasher)
+
+    @Bean
+    fun logoutService(
+        ssoSessionPort: SsoSessionPort,
+        loadOAuthClientPort: LoadOAuthClientPort,
+        backChannelLogoutPort: BackChannelLogoutPort,
+    ) = LogoutService(ssoSessionPort, loadOAuthClientPort, backChannelLogoutPort)
 }

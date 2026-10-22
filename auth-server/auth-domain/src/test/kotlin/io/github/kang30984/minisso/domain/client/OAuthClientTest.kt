@@ -65,6 +65,23 @@ class OAuthClientTest {
     }
 
     @Test
+    fun `Back-Channel Logout 주소도 리다이렉트 URI와 같은 정책으로 검증한다`() {
+        assertThatThrownBy {
+            OAuthClient.register(
+                clientId = "sample-app-b",
+                clientName = "Sample App B",
+                rawSecret = SECRET,
+                redirectUris = setOf("http://127.0.0.1:8082/login/oauth2/code/mini-sso"),
+                postLogoutRedirectUris = emptySet(),
+                scopes = setOf("openid"),
+                hasher = hasher,
+                backchannelLogoutUri = "http://app-b.example.com/logout",
+            )
+        }.isInstanceOf(BusinessException::class.java)
+            .extracting("errorCode").isEqualTo(ErrorCode.INVALID_REDIRECT_URI)
+    }
+
+    @Test
     fun `짧은 시크릿은 등록할 수 없다`() {
         assertThatThrownBy { register(secret = "short") }
             .isInstanceOf(BusinessException::class.java)

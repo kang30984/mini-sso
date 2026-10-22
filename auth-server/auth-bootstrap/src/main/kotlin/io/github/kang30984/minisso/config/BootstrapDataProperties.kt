@@ -28,6 +28,7 @@ data class BootstrapDataProperties(
         val redirectUris: Set<String>,
         val postLogoutRedirectUris: Set<String> = emptySet(),
         val scopes: Set<String> = setOf("openid", "profile", "email"),
+        val backchannelLogoutUri: String? = null,
     ) {
         override fun toString() = "Client(clientId=$clientId, clientSecret=****, redirectUris=$redirectUris)"
     }

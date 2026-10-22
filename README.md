@@ -79,6 +79,7 @@ docker compose up -d                                                          # 
 1. 브라우저에서 http://127.0.0.1:8081 접속
 2. 인증 서버(`localhost:9000`) 로그인 페이지로 이동 → `admin` / `Local-Passw0rd!` 입력
 3. 샘플 앱으로 돌아와 ID 토큰의 클레임(계정 ID, 이름, 부서, 이메일) 확인
+4. "로그아웃" 버튼 → 인증 서버의 SSO 세션까지 종료되어, 다시 접속하면 로그인 페이지가 나타남
 
 인증 서버와 샘플 앱은 일부러 다른 호스트(`localhost` / `127.0.0.1`)로 띄워 쿠키를 공유하지 않는 상태에서 SSO가 동작함을 보여줍니다.
 
@@ -94,7 +95,7 @@ docker compose up -d                                                          # 
 - [x] 1주차: 멀티모듈 골격, Convention Plugin, docker-compose, CI, 아키텍처 테스트
 - [x] 2주차: 계정 도메인, JPA/QueryDSL 어댑터, 계정 API
 - [x] 3주차: Spring Authorization Server 연동, Authorization Code + PKCE, OIDC
-- [ ] 4주차: Redis SSO 세션, Refresh Token 회전·재사용 탐지, 로그아웃
+- [x] 4주차: Redis SSO 세션, Refresh Token 회전·재사용 탐지, 로그아웃
 - [ ] 5주차: SDK core·starter, 서명키 로테이션, 샘플 앱 2개
 - [ ] 6주차: k6 부하 테스트와 성능 개선, 문서 정리
 
@@ -125,6 +126,13 @@ docker compose up -d                                                          # 
 - 로그인 실패 메시지는 "없는 계정 / 탈퇴 / 비밀번호 오류"를 구분하지 않음. 잠금·휴면만 사용자 조치가 필요해 구분
 - 관리자 API는 이 서버가 발급한 JWT의 `ADMIN` 권한으로 보호. 최초 관리자는 기동 설정으로만 생성
 - 인가 코드 + PKCE 전체 흐름(인가 요청 → 로그인 → 코드 → 토큰 교환 → 클레임 검증)을 통합 테스트로 재현해 CI에서 매번 검증
+
+**세션과 토큰 생명주기**
+- 인가 상태(코드·토큰)와 로그인 세션을 Redis에 저장해 재시작·수평 확장에도 유지. 토큰 만료 시각을 그대로 TTL로 써서 정리 배치가 없음 ([ADR-004](docs/adr/004-authorization-state-in-redis.md))
+- Redis 키에는 토큰 원문 대신 SHA-256 해시를 사용
+- 리프레시 토큰 회전 + 재사용 탐지: 이미 회전된 토큰이 다시 오면 탈취로 보고 그 로그인에서 이어진 토큰 전체를 폐기 ([ADR-007](docs/adr/007-refresh-token-reuse-detection.md))
+- 로그아웃(OIDC RP-Initiated Logout): 로그인 세션 종료 → 해당 SSO 세션(`sid`)으로 발급된 토큰 일괄 폐기 → 참여 서비스에 OIDC Back-Channel Logout Token 전송 (비동기, 3회 재시도)
+- 토큰 폐기를 알림 전송보다 먼저 수행해, 알림이 실패한 서비스도 다음 토큰 갱신 시점에 로그아웃됨
 
 **API**
 - 오류 응답은 RFC 9457 ProblemDetail + 자체 코드 ([에러 코드 목록](docs/error-codes.md))
