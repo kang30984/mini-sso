@@ -6,6 +6,8 @@ dependencies {
     implementation(project(":auth-server:auth-application"))
     implementation("org.springframework:spring-web")
     implementation("org.springframework:spring-context")
+    // Spring Boot 스타터를 쓰지 않는 모듈이라 로깅 API를 직접 선언한다 (구현체는 애플리케이션이 제공)
+    implementation("org.slf4j:slf4j-api")
     // Logout Token 서명 (인가 서버와 같은 키를 쓰는 JwtEncoder 빈을 주입받는다)
     implementation("org.springframework.security:spring-security-oauth2-jose")
 
