@@ -4,5 +4,5 @@ plugins {
 }
 
 dependencies {
-    api("com.nimbusds:nimbus-jose-jwt")
+    api(libs.nimbus.jose.jwt)
 }
