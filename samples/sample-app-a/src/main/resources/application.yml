@@ -1,10 +1,5 @@
 server:
   port: 8081
-  servlet:
-    session:
-      cookie:
-        # 같은 호스트(127.0.0.1)에서 다른 포트로 뜨는 샘플 앱끼리 세션 쿠키가 겹치지 않도록 이름을 구분한다
-        name: SAMPLE_APP_A_SESSION
 
 spring:
   application:
@@ -24,3 +19,7 @@ spring:
             # 기동 시 OIDC Discovery 문서를 조회하므로 인증 서버를 먼저 실행해야 한다
             issuer-uri: ${MINISSO_ISSUER_URI:http://localhost:9000}
             user-name-attribute: sub
+
+# 로그인한 사용자의 액세스 토큰으로 호출할 샘플 앱 B (SDK로 보호되는 API)
+sample:
+  app-b-url: ${SAMPLE_APP_B_URL:http://127.0.0.1:8082}

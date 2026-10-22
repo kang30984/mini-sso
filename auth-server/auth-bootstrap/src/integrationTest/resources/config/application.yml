@@ -1,0 +1,4 @@
+# 통합 테스트 전용 설정 (classpath:config/application.yml은 기본 application.yml보다 우선한다)
+minisso:
+  signing-key:
+    encryption-key: KotKMvmve6ddAuIG68bfUKPIjCR6PW2mK52LOqFAneA=   # 테스트 전용

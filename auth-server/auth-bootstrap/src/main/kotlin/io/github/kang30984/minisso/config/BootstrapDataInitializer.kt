@@ -4,22 +4,26 @@ import io.github.kang30984.minisso.application.account.port.inbound.EnsureAdminA
 import io.github.kang30984.minisso.application.account.port.inbound.RegisterAccountCommand
 import io.github.kang30984.minisso.application.client.port.inbound.RegisterOAuthClientCommand
 import io.github.kang30984.minisso.application.client.port.inbound.RegisterOAuthClientUseCase
+import io.github.kang30984.minisso.application.signingkey.port.inbound.EnsureSigningKeyUseCase
 import org.slf4j.LoggerFactory
 import org.springframework.boot.ApplicationArguments
 import org.springframework.boot.ApplicationRunner
 import org.springframework.stereotype.Component
 
-/** 최초 관리자와 OAuth 클라이언트를 등록한다. 이미 있으면 건너뛰므로 여러 번 기동해도 안전하다. */
+/** 서명 키, 최초 관리자, OAuth 클라이언트를 준비한다. 이미 있으면 건너뛰므로 여러 번 기동해도 안전하다. */
 @Component
 class BootstrapDataInitializer(
     private val properties: BootstrapDataProperties,
     private val ensureAdminAccountUseCase: EnsureAdminAccountUseCase,
     private val registerOAuthClientUseCase: RegisterOAuthClientUseCase,
+    private val ensureSigningKeyUseCase: EnsureSigningKeyUseCase,
 ) : ApplicationRunner {
 
     private val log = LoggerFactory.getLogger(javaClass)
 
     override fun run(args: ApplicationArguments) {
+        if (ensureSigningKeyUseCase.ensureActiveKey()) log.info("토큰 서명 키를 생성했습니다.")
+
         properties.admin?.let { admin ->
             val created = ensureAdminAccountUseCase.ensureAdmin(
                 RegisterAccountCommand(

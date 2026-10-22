@@ -1,0 +1,13 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: sample-app-b
+
+# SDK 설정은 이게 전부다
+mini-sso:
+  issuer-uri: ${MINISSO_ISSUER_URI:http://localhost:9000}
+  # 샘플 앱 A가 사용자 대신 받은 토큰으로 이 API를 호출한다
+  audiences: [ sample-app-a ]
+  public-paths: [ /api/public/** ]

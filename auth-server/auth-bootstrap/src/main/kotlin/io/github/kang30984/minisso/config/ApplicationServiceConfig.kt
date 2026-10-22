@@ -14,6 +14,12 @@ import io.github.kang30984.minisso.application.history.service.LoginHistoryQuery
 import io.github.kang30984.minisso.application.session.port.outbound.BackChannelLogoutPort
 import io.github.kang30984.minisso.application.session.port.outbound.SsoSessionPort
 import io.github.kang30984.minisso.application.session.service.LogoutService
+import io.github.kang30984.minisso.application.signingkey.port.outbound.SigningKeyCryptoPort
+import io.github.kang30984.minisso.application.signingkey.port.outbound.SigningKeyPort
+import io.github.kang30984.minisso.application.signingkey.service.SigningKeyService
+import io.github.kang30984.minisso.domain.signingkey.SigningKeyPolicy
+import org.springframework.beans.factory.annotation.Value
+import java.time.Duration
 import io.github.kang30984.minisso.domain.account.AccountPolicy
 import io.github.kang30984.minisso.domain.account.PasswordHasher
 import org.springframework.boot.context.properties.EnableConfigurationProperties
@@ -68,6 +74,14 @@ class ApplicationServiceConfig {
         saveOAuthClientPort: SaveOAuthClientPort,
         passwordHasher: PasswordHasher,
     ) = OAuthClientService(loadOAuthClientPort, saveOAuthClientPort, passwordHasher)
+
+    @Bean
+    fun signingKeyService(
+        signingKeyPort: SigningKeyPort,
+        signingKeyCryptoPort: SigningKeyCryptoPort,
+        @Value("\${minisso.signing-key.retention:1h}") retention: Duration,
+        clock: Clock,
+    ) = SigningKeyService(signingKeyPort, signingKeyCryptoPort, SigningKeyPolicy(retention), clock)
 
     @Bean
     fun logoutService(

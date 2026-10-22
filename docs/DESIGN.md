@@ -67,8 +67,9 @@ flowchart LR
 
 - 로컬 환경은 `docker-compose`로 MySQL, Redis, 인증 서버, 샘플 앱 2개를 띄운다.
 - 인증 서버(`localhost:9000`)와 샘플 앱(`127.0.0.1:8081`, `127.0.0.1:8082`)을 서로 다른 호스트로 띄워 **쿠키를 공유하지 않는 오리진 간 SSO**가 실제로 동작함을 보인다 (인증 서버 세션 기반 SSO).
+  - 샘플 앱 A는 로그인하는 웹 서비스, 샘플 앱 B는 SDK로 보호되는 API 서비스다. A가 사용자 대신 받은 토큰으로 B를 호출한다.
   - 처음에는 `*.localhost` 서브도메인을 계획했으나, 브라우저와 달리 JVM과 Windows 리졸버는 서브도메인을 루프백으로 해석하지 않을 수 있어 변경했다.
-  - 같은 호스트(127.0.0.1)의 샘플 앱끼리는 세션 쿠키 이름을 다르게 지정해 충돌을 막는다.
+  - 샘플 앱 B는 세션을 쓰지 않는(stateless) API라 같은 호스트의 A와 쿠키가 충돌하지 않는다.
 
 ## 4. 모듈 구조
 
@@ -405,9 +406,9 @@ implementation("io.github.kang30984.minisso:auth-sdk-spring-boot-starter:1.0.0")
 ```yaml
 # application.yml
 mini-sso:
-  issuer-uri: http://auth.localhost:9000
-  audience: app-a
-  public-paths: [ "/health", "/public/**" ]
+  issuer-uri: http://localhost:9000
+  audiences: [ sample-app-a ]        # 받아들일 클라이언트의 토큰 (aud)
+  public-paths: [ /api/public/** ]
 ```
 
 ```java

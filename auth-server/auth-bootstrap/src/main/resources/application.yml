@@ -31,6 +31,13 @@ spring:
 minisso:
   # 토큰의 iss 클레임. 비워두면 요청 호스트로 결정되므로 운영에서는 반드시 지정한다.
   issuer-uri: ${MINISSO_ISSUER_URI:}
+  signing-key:
+    # 서명 키 개인키를 암호화하는 AES-256 마스터 키 (Base64, 32바이트). 기본값 없음: 지정하지 않으면 기동하지 않는다.
+    encryption-key: ${MINISSO_KEY_ENCRYPTION_KEY:}
+    # 교체된 키를 JWKS에 게시하는 기간. 토큰 최대 수명(ID 토큰 30분)보다 길어야 한다.
+    retention: 1h
+    # 인스턴스별 서명 키 캐시. 다른 인스턴스의 키 교체가 반영되는 최대 지연이다.
+    cache-ttl: 30s
   account:
     max-failed-attempts: 5
     lock-duration: 30m

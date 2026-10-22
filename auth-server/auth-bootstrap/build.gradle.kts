@@ -29,6 +29,8 @@ testing {
                 // 로그인 폼 CSRF, 테스트용 JWT 주입, 토큰 디코딩
                 implementation("org.springframework.security:spring-security-test")
                 implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
+                // 발급한 토큰을 실제 SDK로 검증해, 키 교체 중에도 서비스 쪽 검증이 끊기지 않는지 확인한다
+                implementation(project(":auth-sdk:auth-sdk-core"))
             }
         }
     }

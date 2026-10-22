@@ -37,5 +37,14 @@
 | CLIENT-005 | INVALID_CLIENT_NAME | 400 | 클라이언트 이름 길이 위반 |
 | CLIENT-201 | DUPLICATE_CLIENT_ID | 409 | 클라이언트 ID 중복 |
 
+### SDK (리소스 서버)
+
+SDK를 적용한 서비스는 인증·인가 실패를 같은 형식으로 응답한다.
+
+| 코드 | HTTP | 설명 |
+|---|---|---|
+| MINISSO-401 | 401 | 토큰 없음, 만료, 서명·클레임 검증 실패. `WWW-Authenticate: Bearer` 헤더 포함 |
+| MINISSO-403 | 403 | `@RequiresScope`의 scope 또는 권한 부족 |
+
 로그인 실패는 에러 코드가 아니라 인증 결과로 다룬다. 사용자에게는 계정 존재 여부가 드러나지 않도록
 `UNKNOWN_ACCOUNT`, `WITHDRAWN`, `BAD_CREDENTIALS`를 같은 메시지로 보여준다 (로그인 화면에 적용됨. 잠금과 휴면은 사용자 조치가 필요하므로 구분해서 안내한다).

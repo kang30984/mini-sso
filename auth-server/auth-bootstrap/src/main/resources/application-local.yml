@@ -2,6 +2,8 @@
 # 여기 있는 비밀번호와 시크릿은 로컬 데모용이다. 운영에서는 환경 변수로 주입한다.
 minisso:
   issuer-uri: http://localhost:9000
+  signing-key:
+    encryption-key: YBCmeqi35jxOgzqWeTVmE/0QpQLTGZn2J9uTsqbdDhE=   # 로컬 데모 전용
   bootstrap:
     admin:
       login-id: admin
@@ -16,3 +18,5 @@ minisso:
         post-logout-redirect-uris:
           - http://127.0.0.1:8081/
         scopes: [ openid, profile, email ]
+        # 다른 서비스에서 로그아웃해도 샘플 앱 A의 세션이 끊기도록 Back-Channel Logout을 받는다
+        backchannel-logout-uri: http://127.0.0.1:8081/logout/connect/back-channel/mini-sso

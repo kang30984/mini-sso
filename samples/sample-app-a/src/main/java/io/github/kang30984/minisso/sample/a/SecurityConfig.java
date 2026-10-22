@@ -2,6 +2,7 @@ package io.github.kang30984.minisso.sample.a;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.oauth2.client.oidc.web.logout.OidcClientInitiatedLogoutSuccessHandler;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
@@ -20,7 +21,10 @@ class SecurityConfig {
                 .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
                 .oauth2Login(login -> login.authorizationEndpoint(
                         endpoint -> endpoint.authorizationRequestResolver(pkceResolver(clientRegistrations))))
-                .logout(logout -> logout.logoutSuccessHandler(ssoLogoutHandler(clientRegistrations)));
+                .logout(logout -> logout.logoutSuccessHandler(ssoLogoutHandler(clientRegistrations)))
+                // 다른 서비스에서 로그아웃하면 인증 서버가 보내는 Logout Token을 받아 이 앱의 세션도 끊는다
+                // 수신 주소: /logout/connect/back-channel/mini-sso
+                .oidcLogout(logout -> logout.backChannel(Customizer.withDefaults()));
         return http.build();
     }
 

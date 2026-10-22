@@ -28,6 +28,7 @@ class HomeController {
                     <tr><th>이메일</th><td>%s</td></tr>
                     <tr><th>발급자</th><td>%s</td></tr>
                   </table>
+                  <p><a href="/call-app-b">내 토큰으로 샘플 앱 B API 호출하기</a></p>
                   <form method="post" action="/logout" style="margin-top:16px">
                     <input type="hidden" name="%s" value="%s">
                     <button type="submit">로그아웃 (SSO 세션까지 종료)</button>

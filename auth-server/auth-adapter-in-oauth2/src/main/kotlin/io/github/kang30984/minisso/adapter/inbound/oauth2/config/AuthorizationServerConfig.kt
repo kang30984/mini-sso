@@ -1,16 +1,15 @@
 package io.github.kang30984.minisso.adapter.inbound.oauth2.config
 
-import com.nimbusds.jose.jwk.JWKSet
-import com.nimbusds.jose.jwk.RSAKey
-import com.nimbusds.jose.jwk.source.ImmutableJWKSet
 import com.nimbusds.jose.jwk.source.JWKSource
 import com.nimbusds.jose.proc.SecurityContext
 import io.github.kang30984.minisso.adapter.inbound.oauth2.client.RegisteredClientRepositoryAdapter
+import io.github.kang30984.minisso.adapter.inbound.oauth2.key.SigningKeyJwkSource
 import io.github.kang30984.minisso.adapter.inbound.oauth2.logout.SsoLogoutSuccessHandler
 import io.github.kang30984.minisso.adapter.inbound.oauth2.token.AccountClaimsTokenCustomizer
 import io.github.kang30984.minisso.application.account.port.inbound.GetAccountQuery
 import io.github.kang30984.minisso.application.client.port.inbound.GetOAuthClientQuery
 import io.github.kang30984.minisso.application.session.port.inbound.LogoutUseCase
+import io.github.kang30984.minisso.application.signingkey.port.inbound.GetSigningKeysQuery
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -30,10 +29,8 @@ import org.springframework.security.oauth2.server.authorization.token.OAuth2Toke
 import org.springframework.security.web.SecurityFilterChain
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher
-import java.security.KeyPairGenerator
-import java.security.interfaces.RSAPrivateKey
-import java.security.interfaces.RSAPublicKey
-import java.util.UUID
+import java.time.Clock
+import java.time.Duration
 
 @Configuration(proxyBeanMethods = false)
 class AuthorizationServerConfig {
@@ -76,23 +73,21 @@ class AuthorizationServerConfig {
     fun accountClaimsTokenCustomizer(getAccountQuery: GetAccountQuery): OAuth2TokenCustomizer<JwtEncodingContext> =
         AccountClaimsTokenCustomizer(getAccountQuery)
 
-    /**
-     * 서명 키. 지금은 기동 시 생성하므로 재시작하면 이전 토큰을 검증할 수 없다.
-     * 5주차에 DB 저장 + 무중단 로테이션(ADR-008)으로 교체한다.
-     */
+    /** DB에 저장된 서명 키 (ADR-008). 기동 시 활성 키가 없으면 BootstrapDataInitializer가 만든다. */
     @Bean
-    fun jwkSource(): JWKSource<SecurityContext> {
-        val keyPair = KeyPairGenerator.getInstance("RSA").apply { initialize(RSA_KEY_SIZE) }.generateKeyPair()
-        val rsaKey = RSAKey.Builder(keyPair.public as RSAPublicKey)
-            .privateKey(keyPair.private as RSAPrivateKey)
-            .keyID(UUID.randomUUID().toString())
-            .build()
-        return ImmutableJWKSet(JWKSet(rsaKey))
-    }
+    fun signingKeyJwkSource(
+        getSigningKeysQuery: GetSigningKeysQuery,
+        clock: Clock,
+        @Value("\${minisso.signing-key.cache-ttl:30s}") cacheTtl: Duration,
+    ) = SigningKeyJwkSource(getSigningKeysQuery, clock, cacheTtl)
 
-    /** 토큰 서명. 인가 서버의 토큰 발급과 Back-Channel Logout Token 서명이 같은 키를 쓴다. */
+    /** JWKS 엔드포인트(/oauth2/jwks)와 토큰 검증이 쓰는 공개키 집합 */
     @Bean
-    fun jwtEncoder(jwkSource: JWKSource<SecurityContext>): JwtEncoder = NimbusJwtEncoder(jwkSource)
+    fun jwkSource(signingKeyJwkSource: SigningKeyJwkSource): JWKSource<SecurityContext> = signingKeyJwkSource.publishedKeys
+
+    /** 토큰 서명. 인가 서버의 토큰 발급과 Back-Channel Logout Token 서명이 같은 활성 키를 쓴다. */
+    @Bean
+    fun jwtEncoder(signingKeyJwkSource: SigningKeyJwkSource): JwtEncoder = NimbusJwtEncoder(signingKeyJwkSource.signingKeys)
 
     /** 자기 자신이 발급한 토큰을 검증할 때 네트워크 호출 없이 같은 키를 사용한다 */
     @Bean
@@ -106,7 +101,4 @@ class AuthorizationServerConfig {
             .apply { if (issuerUri.isNotBlank()) issuer(issuerUri) }
             .build()
 
-    companion object {
-        private const val RSA_KEY_SIZE = 2048
-    }
 }

@@ -25,6 +25,6 @@ include(
     ":auth-sdk:auth-sdk-spring-boot-starter",
 )
 
-// sample-app-a: 3주차 (Spring Security OAuth2 Client로 로그인)
-// sample-app-b: 5주차 (SDK 적용 후 추가)
-include(":samples:sample-app-a")
+// sample-app-a: 로그인하는 웹 서비스 (Java, Spring Security OAuth2 Client)
+// sample-app-b: SDK로 보호되는 API 서비스 (Kotlin)
+include(":samples:sample-app-a", ":samples:sample-app-b")

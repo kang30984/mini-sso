@@ -1,4 +1,8 @@
-// Spring 의존 없는 순수 JWT 검증 라이브러리 (5주차 구현)
+// Spring에 의존하지 않는 토큰 검증 라이브러리. 배치, 게이트웨이 등 Spring 밖에서도 쓸 수 있다.
 plugins {
     id("minisso.java-library-conventions")
+}
+
+dependencies {
+    api("com.nimbusds:nimbus-jose-jwt")
 }
