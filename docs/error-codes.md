@@ -30,6 +30,12 @@
 | ACCOUNT-202 | DUPLICATE_EMAIL | 409 | 이메일 중복 |
 | ACCOUNT-203 | DUPLICATE_ACCOUNT | 409 | 동시 가입으로 유니크 제약 위반 |
 | HISTORY-001 | INVALID_SEARCH_PERIOD | 400 | 이력 조회 기간 오류 (최대 31일) |
+| CLIENT-001 | INVALID_CLIENT_ID | 400 | 클라이언트 ID 형식 위반 |
+| CLIENT-002 | INVALID_CLIENT_SECRET | 400 | 클라이언트 시크릿 16자 미만 |
+| CLIENT-003 | INVALID_REDIRECT_URI | 400 | 리다이렉트 URI 정책 위반 (http는 로컬 주소만, 와일드카드·fragment 금지) |
+| CLIENT-004 | INVALID_SCOPE | 400 | openid 누락 또는 지원하지 않는 scope |
+| CLIENT-005 | INVALID_CLIENT_NAME | 400 | 클라이언트 이름 길이 위반 |
+| CLIENT-201 | DUPLICATE_CLIENT_ID | 409 | 클라이언트 ID 중복 |
 
 로그인 실패는 에러 코드가 아니라 인증 결과로 다룬다. 사용자에게는 계정 존재 여부가 드러나지 않도록
-`UNKNOWN_ACCOUNT`, `WITHDRAWN`, `BAD_CREDENTIALS`를 같은 메시지로 보여준다 (3주차 로그인 화면에서 적용).
+`UNKNOWN_ACCOUNT`, `WITHDRAWN`, `BAD_CREDENTIALS`를 같은 메시지로 보여준다 (로그인 화면에 적용됨. 잠금과 휴면은 사용자 조치가 필요하므로 구분해서 안내한다).

@@ -9,6 +9,7 @@ import io.github.kang30984.minisso.domain.account.PasswordHash
 internal fun AccountJpaEntity.toDomain(): Account = Account.reconstitute(
     id = AccountId(checkNotNull(id)),
     loginId = LoginId(loginId),
+    role = role,
     email = Email(email),
     name = name,
     department = department,
@@ -22,6 +23,7 @@ internal fun AccountJpaEntity.toDomain(): Account = Account.reconstitute(
 
 internal fun Account.toNewEntity(): AccountJpaEntity = AccountJpaEntity(
     loginId = loginId.value,
+    role = role,
     email = email.value,
     name = name,
     department = department,
@@ -33,7 +35,7 @@ internal fun Account.toNewEntity(): AccountJpaEntity = AccountJpaEntity(
     lastLoginAt = lastLoginAt,
 )
 
-/** 관리 중인(managed) 엔티티에 도메인 상태를 반영한다. loginId는 변경 불가 값이므로 반영하지 않는다. */
+/** 관리 중인(managed) 엔티티에 도메인 상태를 반영한다. loginId와 role은 변경 불가 값이므로 반영하지 않는다. */
 internal fun AccountJpaEntity.updateFrom(account: Account) {
     email = account.email.value
     name = account.name

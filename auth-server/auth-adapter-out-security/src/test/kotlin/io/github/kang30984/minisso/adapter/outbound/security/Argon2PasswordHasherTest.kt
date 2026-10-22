@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test
 
 class Argon2PasswordHasherTest {
 
-    private val hasher = Argon2PasswordHasher()
+    private val hasher = Argon2PasswordHasher(PasswordEncoderConfig.create())
 
     @Test
     fun `해시는 알고리즘 접두어를 가지며 같은 비밀번호도 매번 다른 값이 된다 (salt)`() {

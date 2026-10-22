@@ -35,7 +35,12 @@ class LoginServiceTest {
         val result = service.login(command(password = AccountFixture.PASSWORD))
 
         assertThat(result).isEqualTo(
-            AuthenticationResult.Authenticated(accountId = 1L, loginId = AccountFixture.LOGIN_ID, passwordChangeRequired = false),
+            AuthenticationResult.Authenticated(
+                accountId = 1L,
+                loginId = AccountFixture.LOGIN_ID,
+                role = "USER",
+                passwordChangeRequired = false,
+            ),
         )
         assertThat(histories.histories.single().outcome).isEqualTo(LoginOutcome.SUCCESS)
     }

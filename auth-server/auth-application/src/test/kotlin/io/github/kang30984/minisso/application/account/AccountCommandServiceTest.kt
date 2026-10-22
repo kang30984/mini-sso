@@ -66,6 +66,15 @@ class AccountCommandServiceTest {
     }
 
     @Test
+    fun `최초 관리자는 한 번만 생성되고 ADMIN 권한을 가진다`() {
+        assertThat(service.ensureAdmin(registerCommand(loginId = "root.admin", email = "root@example.com"))).isTrue()
+        assertThat(service.ensureAdmin(registerCommand(loginId = "root.admin", email = "root@example.com"))).isFalse()
+
+        val admin = checkNotNull(accounts.findByLoginId(io.github.kang30984.minisso.domain.account.LoginId("root.admin")))
+        assertThat(admin.role).isEqualTo(io.github.kang30984.minisso.domain.account.AccountRole.ADMIN)
+    }
+
+    @Test
     fun `커맨드의 toString에는 비밀번호가 노출되지 않는다`() {
         assertThat(registerCommand().toString()).doesNotContain(AccountFixture.PASSWORD)
     }

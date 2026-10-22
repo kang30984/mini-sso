@@ -2,6 +2,7 @@ package io.github.kang30984.minisso.domain.fixture
 
 import io.github.kang30984.minisso.domain.account.Account
 import io.github.kang30984.minisso.domain.account.AccountId
+import io.github.kang30984.minisso.domain.account.AccountRole
 import io.github.kang30984.minisso.domain.account.AccountStatus
 import io.github.kang30984.minisso.domain.account.Email
 import io.github.kang30984.minisso.domain.account.LoginId
@@ -20,9 +21,11 @@ object AccountFixture {
         hasher: PasswordHasher = FakePasswordHasher(),
         status: AccountStatus = AccountStatus.ACTIVE,
         passwordChangedAt: Instant = NOW,
+        role: AccountRole = AccountRole.USER,
     ): Account = Account.reconstitute(
         id = AccountId(id),
         loginId = LoginId(loginId),
+        role = role,
         email = Email("$loginId@example.com"),
         name = "홍길동",
         department = "플랫폼개발팀",

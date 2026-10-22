@@ -26,6 +26,9 @@ testing {
                 // 시나리오 테스트가 MockMvc, MediaType, ObjectMapper를 직접 사용한다.
                 // 웹 라이브러리는 web 어댑터의 implementation이라 bootstrap 컴파일 경로에는 보이지 않으므로 테스트에만 추가한다.
                 implementation("org.springframework.boot:spring-boot-starter-web")
+                // 로그인 폼 CSRF, 테스트용 JWT 주입, 토큰 디코딩
+                implementation("org.springframework.security:spring-security-test")
+                implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
             }
         }
     }

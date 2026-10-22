@@ -9,6 +9,7 @@ interface GetAccountQuery {
 data class AccountView(
     val id: Long,
     val loginId: String,
+    val role: String,
     val email: String,
     val name: String,
     val department: String,

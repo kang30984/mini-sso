@@ -25,5 +25,6 @@ include(
     ":auth-sdk:auth-sdk-spring-boot-starter",
 )
 
-// 5주차: SDK 완성 후 샘플 앱 추가
-// include(":samples:sample-app-a", ":samples:sample-app-b")
+// sample-app-a: 3주차 (Spring Security OAuth2 Client로 로그인)
+// sample-app-b: 5주차 (SDK 적용 후 추가)
+include(":samples:sample-app-a")

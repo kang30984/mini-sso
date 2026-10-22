@@ -58,6 +58,7 @@ flowchart TD
 | `auth-bootstrap` | 실행 진입점, 빈 조립, 아키텍처 테스트 |
 | `auth-sdk-core` | Spring 의존 없는 JWT 검증 |
 | `auth-sdk-spring-boot-starter` | AutoConfiguration 기반 SDK |
+| `samples/sample-app-a` | SSO 데모용 서비스 (Java, Spring Security OAuth2 Client) |
 
 자세한 설계는 [docs/DESIGN.md](docs/DESIGN.md)를 참고하세요.
 
@@ -66,9 +67,20 @@ flowchart TD
 요구 사항: JDK 21, Docker
 
 ```bash
-docker compose up -d                                  # MySQL, Redis
-./gradlew :auth-server:auth-bootstrap:bootRun         # http://localhost:9000/actuator/health
+docker compose up -d                                                          # MySQL, Redis
+./gradlew :auth-server:auth-bootstrap:bootRun --args='--spring.profiles.active=local'   # 인증 서버 :9000
+./gradlew :samples:sample-app-a:bootRun                                       # 샘플 앱 :8081
 ```
+
+`local` 프로필은 기동 시 최초 관리자(`admin` / `Local-Passw0rd!`)와 샘플 앱 클라이언트를 등록합니다. 로컬 데모용 값이며, 운영에서는 환경 변수로 주입합니다.
+
+**SSO 로그인 데모**
+
+1. 브라우저에서 http://127.0.0.1:8081 접속
+2. 인증 서버(`localhost:9000`) 로그인 페이지로 이동 → `admin` / `Local-Passw0rd!` 입력
+3. 샘플 앱으로 돌아와 ID 토큰의 클레임(계정 ID, 이름, 부서, 이메일) 확인
+
+인증 서버와 샘플 앱은 일부러 다른 호스트(`localhost` / `127.0.0.1`)로 띄워 쿠키를 공유하지 않는 상태에서 SSO가 동작함을 보여줍니다.
 
 테스트
 
@@ -81,7 +93,7 @@ docker compose up -d                                  # MySQL, Redis
 
 - [x] 1주차: 멀티모듈 골격, Convention Plugin, docker-compose, CI, 아키텍처 테스트
 - [x] 2주차: 계정 도메인, JPA/QueryDSL 어댑터, 계정 API
-- [ ] 3주차: Spring Authorization Server 연동, Authorization Code + PKCE, OIDC
+- [x] 3주차: Spring Authorization Server 연동, Authorization Code + PKCE, OIDC
 - [ ] 4주차: Redis SSO 세션, Refresh Token 회전·재사용 탐지, 로그아웃
 - [ ] 5주차: SDK core·starter, 서명키 로테이션, 샘플 앱 2개
 - [ ] 6주차: k6 부하 테스트와 성능 개선, 문서 정리
@@ -105,27 +117,43 @@ docker compose up -d                                  # MySQL, Redis
 - 로그인 이력 검색은 QueryDSL 동적 조건 + No-Offset 커서 페이징, 조회 기간 최대 31일 강제
 - 동시 가입 시 유니크 제약 위반을 도메인 에러 코드로 변환, 계정 수정은 `@Version` 낙관적 락
 
+**OAuth2 / OIDC (Spring Authorization Server)**
+- 프레임워크 확장 지점(`RegisteredClientRepository`, `AuthenticationProvider`, `OAuth2TokenCustomizer`)을 애플리케이션 포트에 연결하는 어댑터로 구현. 클라이언트 저장 구조와 로그인 정책은 도메인이 소유
+- 모든 클라이언트에 PKCE(S256) 필수, 사내 1st-party 클라이언트라 동의 화면 생략 ([ADR-010](docs/adr/010-first-party-clients-pkce.md))
+- 리다이렉트 URI 등록 정책: 절대 URI만, 와일드카드·fragment·사용자 정보 금지, http는 로컬 주소만 허용
+- 토큰의 `sub`는 변하지 않는 계정 ID. ID 토큰에는 화면 표시용 프로필, 액세스 토큰에는 인가용 `roles`만 담아 개인정보 노출을 최소화
+- 로그인 실패 메시지는 "없는 계정 / 탈퇴 / 비밀번호 오류"를 구분하지 않음. 잠금·휴면만 사용자 조치가 필요해 구분
+- 관리자 API는 이 서버가 발급한 JWT의 `ADMIN` 권한으로 보호. 최초 관리자는 기동 설정으로만 생성
+- 인가 코드 + PKCE 전체 흐름(인가 요청 → 로그인 → 코드 → 토큰 교환 → 클레임 검증)을 통합 테스트로 재현해 CI에서 매번 검증
+
 **API**
 - 오류 응답은 RFC 9457 ProblemDetail + 자체 코드 ([에러 코드 목록](docs/error-codes.md))
 - 비밀번호가 담긴 요청·커맨드 객체는 `toString`에서 마스킹
 
 ## API 예시
 
+관리자 API는 `ADMIN` 권한이 담긴 액세스 토큰이 필요합니다.
+
 ```bash
 # 계정 생성
-curl -X POST localhost:9000/api/admin/v1/accounts -H 'Content-Type: application/json' -d '{
+curl -X POST localhost:9000/api/admin/v1/accounts \
+  -H "Authorization: Bearer $ADMIN_TOKEN" -H 'Content-Type: application/json' -d '{
   "loginId": "kim.cs", "email": "kim.cs@example.com",
   "name": "김철수", "department": "보안팀", "initialPassword": "Sso-Passw0rd!"
 }'
 
 # 잠금 해제
-curl -X POST localhost:9000/api/admin/v1/accounts/1/unlock
+curl -X POST localhost:9000/api/admin/v1/accounts/1/unlock -H "Authorization: Bearer $ADMIN_TOKEN"
 
 # 로그인 이력 검색 (다음 페이지는 응답의 nextCursor를 cursor로 전달)
-curl 'localhost:9000/api/admin/v1/login-histories?from=2026-10-01T00:00:00Z&to=2026-10-31T00:00:00Z&outcome=FAILURE&size=20'
+curl -H "Authorization: Bearer $ADMIN_TOKEN" \
+  'localhost:9000/api/admin/v1/login-histories?from=2026-10-01T00:00:00Z&to=2026-10-31T00:00:00Z&outcome=FAILURE&size=20'
+
+# OIDC Discovery
+curl localhost:9000/.well-known/openid-configuration
 ```
 
-> 관리자 API 인증은 3주차에 Spring Security와 함께 적용합니다.
+> 서명 키는 현재 기동할 때마다 새로 생성되어, 재시작하면 기존 토큰이 무효가 됩니다. 5주차에 DB 저장과 무중단 로테이션으로 교체합니다.
 
 ## 성능 측정
 

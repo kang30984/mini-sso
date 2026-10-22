@@ -24,6 +24,7 @@ sealed interface AuthenticationResult {
     data class Authenticated(
         val accountId: Long,
         val loginId: String,
+        val role: String,
         val passwordChangeRequired: Boolean,
     ) : AuthenticationResult
 

@@ -13,6 +13,11 @@ internal fun ErrorCode.httpStatus(): HttpStatus = when (this) {
     ErrorCode.PASSWORD_REUSED,
     ErrorCode.INVALID_PROFILE,
     ErrorCode.INVALID_SEARCH_PERIOD,
+    ErrorCode.INVALID_CLIENT_ID,
+    ErrorCode.INVALID_CLIENT_SECRET,
+    ErrorCode.INVALID_REDIRECT_URI,
+    ErrorCode.INVALID_SCOPE,
+    ErrorCode.INVALID_CLIENT_NAME,
     -> HttpStatus.BAD_REQUEST
 
     ErrorCode.ACCOUNT_NOT_FOUND -> HttpStatus.NOT_FOUND
@@ -21,5 +26,6 @@ internal fun ErrorCode.httpStatus(): HttpStatus = when (this) {
     ErrorCode.DUPLICATE_LOGIN_ID,
     ErrorCode.DUPLICATE_EMAIL,
     ErrorCode.DUPLICATE_ACCOUNT,
+    ErrorCode.DUPLICATE_CLIENT_ID,
     -> HttpStatus.CONFLICT
 }

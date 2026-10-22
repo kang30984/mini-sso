@@ -5,6 +5,9 @@ import io.github.kang30984.minisso.application.account.port.outbound.SaveAccount
 import io.github.kang30984.minisso.application.account.service.AccountCommandService
 import io.github.kang30984.minisso.application.account.service.AccountQueryService
 import io.github.kang30984.minisso.application.account.service.LoginService
+import io.github.kang30984.minisso.application.client.port.outbound.LoadOAuthClientPort
+import io.github.kang30984.minisso.application.client.port.outbound.SaveOAuthClientPort
+import io.github.kang30984.minisso.application.client.service.OAuthClientService
 import io.github.kang30984.minisso.application.history.port.outbound.SaveLoginHistoryPort
 import io.github.kang30984.minisso.application.history.port.outbound.SearchLoginHistoryPort
 import io.github.kang30984.minisso.application.history.service.LoginHistoryQueryService
@@ -20,7 +23,7 @@ import java.time.Clock
  * 유스케이스가 어떤 포트에 의존하는지 이 파일 하나로 드러난다.
  */
 @Configuration(proxyBeanMethods = false)
-@EnableConfigurationProperties(AccountPolicyProperties::class)
+@EnableConfigurationProperties(AccountPolicyProperties::class, BootstrapDataProperties::class)
 class ApplicationServiceConfig {
 
     @Bean
@@ -55,4 +58,11 @@ class ApplicationServiceConfig {
     @Bean
     fun loginHistoryQueryService(searchLoginHistoryPort: SearchLoginHistoryPort) =
         LoginHistoryQueryService(searchLoginHistoryPort)
+
+    @Bean
+    fun oAuthClientService(
+        loadOAuthClientPort: LoadOAuthClientPort,
+        saveOAuthClientPort: SaveOAuthClientPort,
+        passwordHasher: PasswordHasher,
+    ) = OAuthClientService(loadOAuthClientPort, saveOAuthClientPort, passwordHasher)
 }

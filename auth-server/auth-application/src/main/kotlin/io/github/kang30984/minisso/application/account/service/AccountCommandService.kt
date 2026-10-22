@@ -2,6 +2,7 @@ package io.github.kang30984.minisso.application.account.service
 
 import io.github.kang30984.minisso.application.account.port.inbound.ChangePasswordCommand
 import io.github.kang30984.minisso.application.account.port.inbound.ChangePasswordUseCase
+import io.github.kang30984.minisso.application.account.port.inbound.EnsureAdminAccountUseCase
 import io.github.kang30984.minisso.application.account.port.inbound.RegisterAccountCommand
 import io.github.kang30984.minisso.application.account.port.inbound.RegisterAccountUseCase
 import io.github.kang30984.minisso.application.account.port.inbound.UnlockAccountUseCase
@@ -10,6 +11,7 @@ import io.github.kang30984.minisso.application.account.port.outbound.SaveAccount
 import io.github.kang30984.minisso.domain.account.Account
 import io.github.kang30984.minisso.domain.account.AccountId
 import io.github.kang30984.minisso.domain.account.AccountPolicy
+import io.github.kang30984.minisso.domain.account.AccountRole
 import io.github.kang30984.minisso.domain.account.Email
 import io.github.kang30984.minisso.domain.account.LoginId
 import io.github.kang30984.minisso.domain.account.PasswordHasher
@@ -25,9 +27,17 @@ class AccountCommandService(
     private val passwordHasher: PasswordHasher,
     private val accountPolicy: AccountPolicy,
     private val clock: Clock,
-) : RegisterAccountUseCase, ChangePasswordUseCase, UnlockAccountUseCase {
+) : RegisterAccountUseCase, ChangePasswordUseCase, UnlockAccountUseCase, EnsureAdminAccountUseCase {
 
-    override fun register(command: RegisterAccountCommand): Long {
+    override fun register(command: RegisterAccountCommand): Long = register(command, AccountRole.USER)
+
+    override fun ensureAdmin(command: RegisterAccountCommand): Boolean {
+        if (loadAccountPort.existsByLoginId(LoginId(command.loginId))) return false
+        register(command, AccountRole.ADMIN)
+        return true
+    }
+
+    private fun register(command: RegisterAccountCommand, role: AccountRole): Long {
         val loginId = LoginId(command.loginId)
         val email = Email(command.email)
         if (loadAccountPort.existsByLoginId(loginId)) throw BusinessException(ErrorCode.DUPLICATE_LOGIN_ID)
@@ -42,6 +52,7 @@ class AccountCommandService(
             hasher = passwordHasher,
             policy = accountPolicy,
             now = clock.instant(),
+            role = role,
         )
         return checkNotNull(saveAccountPort.save(account).id) { "저장된 계정에 ID가 없습니다." }.value
     }

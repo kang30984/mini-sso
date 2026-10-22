@@ -23,6 +23,7 @@ class InMemoryAccountRepository : LoadAccountPort, SaveAccountPort {
         val saved = account.id?.let { account } ?: Account.reconstitute(
             id = AccountId(++sequence),
             loginId = account.loginId,
+            role = account.role,
             email = account.email,
             name = account.name,
             department = account.department,

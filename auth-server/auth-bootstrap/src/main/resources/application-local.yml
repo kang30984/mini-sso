@@ -1,0 +1,18 @@
+# 로컬 개발 전용 프로필 (--spring.profiles.active=local)
+# 여기 있는 비밀번호와 시크릿은 로컬 데모용이다. 운영에서는 환경 변수로 주입한다.
+minisso:
+  issuer-uri: http://localhost:9000
+  bootstrap:
+    admin:
+      login-id: admin
+      email: admin@example.com
+      password: Local-Passw0rd!
+    clients:
+      - client-id: sample-app-a
+        client-name: Sample App A
+        client-secret: local-sample-app-a-secret
+        redirect-uris:
+          - http://127.0.0.1:8081/login/oauth2/code/mini-sso
+        post-logout-redirect-uris:
+          - http://127.0.0.1:8081/
+        scopes: [ openid, profile, email ]

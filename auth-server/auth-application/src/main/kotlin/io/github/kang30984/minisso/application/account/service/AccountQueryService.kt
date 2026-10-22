@@ -22,6 +22,7 @@ class AccountQueryService(
         return AccountView(
             id = accountId,
             loginId = account.loginId.value,
+            role = account.role.name,
             email = account.email.value,
             name = account.name,
             department = account.department,

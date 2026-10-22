@@ -101,7 +101,7 @@ class AdminAccountControllerTest {
             override fun getAccount(accountId: Long): AccountView {
                 if (accountId != 1L) throw BusinessException(ErrorCode.ACCOUNT_NOT_FOUND)
                 return AccountView(
-                    1L, "kim.cs", "kim.cs@example.com", "김철수", "보안팀", "ACTIVE",
+                    1L, "kim.cs", "USER", "kim.cs@example.com", "김철수", "보안팀", "ACTIVE",
                     false, null, null, Instant.parse("2026-10-01T00:00:00Z"),
                 )
             }

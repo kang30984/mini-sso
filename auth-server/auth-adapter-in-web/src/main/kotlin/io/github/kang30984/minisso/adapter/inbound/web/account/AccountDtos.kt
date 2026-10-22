@@ -37,6 +37,7 @@ data class AccountIdResponse(val id: Long)
 data class AccountResponse(
     val id: Long,
     val loginId: String,
+    val role: String,
     val email: String,
     val name: String,
     val department: String,
@@ -50,6 +51,7 @@ data class AccountResponse(
         fun from(view: AccountView) = AccountResponse(
             id = view.id,
             loginId = view.loginId,
+            role = view.role,
             email = view.email,
             name = view.name,
             department = view.department,

@@ -1,0 +1,26 @@
+server:
+  port: 8081
+  servlet:
+    session:
+      cookie:
+        # 같은 호스트(127.0.0.1)에서 다른 포트로 뜨는 샘플 앱끼리 세션 쿠키가 겹치지 않도록 이름을 구분한다
+        name: SAMPLE_APP_A_SESSION
+
+spring:
+  application:
+    name: sample-app-a
+  security:
+    oauth2:
+      client:
+        registration:
+          mini-sso:
+            client-id: sample-app-a
+            client-secret: ${SAMPLE_APP_A_SECRET:local-sample-app-a-secret}
+            authorization-grant-type: authorization_code
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            scope: openid, profile, email
+        provider:
+          mini-sso:
+            # 기동 시 OIDC Discovery 문서를 조회하므로 인증 서버를 먼저 실행해야 한다
+            issuer-uri: ${MINISSO_ISSUER_URI:http://localhost:9000}
+            user-name-attribute: sub

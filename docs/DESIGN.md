@@ -66,7 +66,9 @@ flowchart LR
 ```
 
 - 로컬 환경은 `docker-compose`로 MySQL, Redis, 인증 서버, 샘플 앱 2개를 띄운다.
-- `*.localhost` 도메인을 분리해 **서로 다른 오리진 간 SSO**가 실제로 동작함을 보인다 (쿠키 공유가 아닌 인증 서버 세션 기반 SSO).
+- 인증 서버(`localhost:9000`)와 샘플 앱(`127.0.0.1:8081`, `127.0.0.1:8082`)을 서로 다른 호스트로 띄워 **쿠키를 공유하지 않는 오리진 간 SSO**가 실제로 동작함을 보인다 (인증 서버 세션 기반 SSO).
+  - 처음에는 `*.localhost` 서브도메인을 계획했으나, 브라우저와 달리 JVM과 Windows 리졸버는 서브도메인을 루프백으로 해석하지 않을 수 있어 변경했다.
+  - 같은 호스트(127.0.0.1)의 샘플 앱끼리는 세션 쿠키 이름을 다르게 지정해 충돌을 막는다.
 
 ## 4. 모듈 구조
 
@@ -183,7 +185,8 @@ class Account(/* ... */) {
 
 ### 5.2 기타 도메인
 
-- **OAuthClient**: `clientId`, 시크릿 해시, `redirectUris`, `scopes`, `grantTypes`, `requirePkce`, `backchannelLogoutUri`
+- **OAuthClient**: `clientId`, 시크릿 해시, `redirectUris`, `postLogoutRedirectUris`, `scopes` (PKCE와 grant type은 모든 클라이언트 공통 정책, ADR-010. `backchannelLogoutUri`는 4주차에 추가)
+- **AccountRole**: `USER`, `ADMIN`. 액세스 토큰의 `roles` 클레임으로 발급되어 관리자 API 접근을 제어한다
 - **SigningKey**: `kid`, `status`(`ACTIVE` → `RETIRING` → `RETIRED`), 공개키 JWK, 암호화된 개인키, `activatedAt`
 - **SsoSession**: `sid`, `accountId`, `authTime`, 참여 클라이언트 목록 (Redis에만 존재)
 - **LoginHistory**: `accountId`, `clientId`, `ip`, `userAgent`, `result`, `reason`, `occurredAt`
@@ -194,13 +197,13 @@ class Account(/* ... */) {
 
 ```mermaid
 erDiagram
-    ACCOUNT ||--o{ LOGIN_HISTORY : "기록"
-    OAUTH_CLIENT ||--o{ OAUTH_CLIENT_REDIRECT_URI : "보유"
+    ACCOUNT ||--o{ LOGIN_HISTORY : "기록 (FK 없음, ADR-009)"
     OAUTH_CLIENT ||--o{ LOGIN_HISTORY : "경유"
 
     ACCOUNT {
         bigint id PK
         varchar login_id UK
+        varchar role "USER, ADMIN"
         varchar email UK
         varchar name
         varchar department
@@ -225,16 +228,11 @@ erDiagram
     OAUTH_CLIENT {
         bigint id PK
         varchar client_id UK
-        varchar client_secret_hash
-        varchar scopes
-        varchar grant_types
-        boolean require_pkce
-        varchar backchannel_logout_uri
-    }
-    OAUTH_CLIENT_REDIRECT_URI {
-        bigint id PK
-        bigint oauth_client_id FK
-        varchar redirect_uri
+        varchar client_name
+        varchar client_secret_hash "Argon2id"
+        varchar redirect_uris "공백 구분"
+        varchar post_logout_redirect_uris "공백 구분"
+        varchar scopes "공백 구분"
     }
     SIGNING_KEY {
         bigint id PK
@@ -530,5 +528,6 @@ publish-sdk:  태그(v*) 푸시 시에만 SDK를 GitLab Package Registry에 배�
 - ADR-007 Refresh Token 재사용 탐지 시 계보 전체 폐기
 - ADR-008 서명키 로테이션 시 이전 키 게시 기간 결정
 - ADR-009 로그인 이력 테이블에 계정 FK를 두지 않음
+- ADR-010 1st-party 클라이언트는 동의 화면 생략, PKCE는 기밀 클라이언트에도 필수
 
 각 ADR은 배경, 선택지, 결정, 결과(트레이드오프) 형식으로 작성한다. 면접에서 "왜 그렇게 했는지"를 설명할 근거가 된다.

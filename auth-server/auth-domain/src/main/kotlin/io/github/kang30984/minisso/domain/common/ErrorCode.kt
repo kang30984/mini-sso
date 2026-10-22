@@ -22,4 +22,11 @@ enum class ErrorCode(val code: String, val message: String) {
     DUPLICATE_ACCOUNT("ACCOUNT-203", "이미 존재하는 계정입니다."),
 
     INVALID_SEARCH_PERIOD("HISTORY-001", "조회 기간은 시작 시각이 종료 시각보다 앞서야 하며 최대 31일입니다."),
+
+    INVALID_CLIENT_ID("CLIENT-001", "클라이언트 ID는 영문 소문자로 시작하고 영문 소문자, 숫자, '-'로 이루어진 3~50자여야 합니다."),
+    INVALID_CLIENT_SECRET("CLIENT-002", "클라이언트 시크릿은 16자 이상이어야 합니다."),
+    INVALID_REDIRECT_URI("CLIENT-003", "리다이렉트 URI는 https(로컬 주소는 http 허용) 절대 경로여야 하며 와일드카드, fragment, 사용자 정보를 포함할 수 없습니다."),
+    INVALID_SCOPE("CLIENT-004", "scope에는 openid가 포함되어야 하며 openid, profile, email만 허용됩니다."),
+    INVALID_CLIENT_NAME("CLIENT-005", "클라이언트 이름은 1~100자여야 합니다."),
+    DUPLICATE_CLIENT_ID("CLIENT-201", "이미 등록된 클라이언트 ID입니다."),
 }

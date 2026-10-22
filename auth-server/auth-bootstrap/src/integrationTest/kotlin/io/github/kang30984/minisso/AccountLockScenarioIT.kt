@@ -12,6 +12,8 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType
+import org.springframework.security.core.authority.SimpleGrantedAuthority
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
@@ -44,11 +46,11 @@ class AccountLockScenarioIT {
         assertThat(login("scenario.user", "wrong")).isEqualTo(failed(LoginFailureReason.LOCKED))
         assertThat(login("scenario.user", PASSWORD)).isEqualTo(failed(LoginFailureReason.LOCKED))
 
-        mockMvc.get("/api/admin/v1/accounts/$accountId").andExpect {
+        mockMvc.get("/api/admin/v1/accounts/$accountId") { with(adminToken()) }.andExpect {
             jsonPath("$.locked") { value(true) }
         }
 
-        mockMvc.post("/api/admin/v1/accounts/$accountId/unlock").andExpect { status { isNoContent() } }
+        mockMvc.post("/api/admin/v1/accounts/$accountId/unlock") { with(adminToken()) }.andExpect { status { isNoContent() } }
 
         assertThat(login("scenario.user", PASSWORD)).isInstanceOf(AuthenticationResult.Authenticated::class.java)
     }
@@ -61,6 +63,7 @@ class AccountLockScenarioIT {
 
         val now = Instant.now()
         mockMvc.get("/api/admin/v1/login-histories") {
+            with(adminToken())
             param("from", now.minus(1, ChronoUnit.HOURS).toString())
             param("to", now.plus(1, ChronoUnit.HOURS).toString())
             param("loginIdPrefix", "history.user")
@@ -74,6 +77,7 @@ class AccountLockScenarioIT {
 
     private fun register(loginId: String): Long {
         val response = mockMvc.post("/api/admin/v1/accounts") {
+            with(adminToken())
             contentType = MediaType.APPLICATION_JSON
             content = objectMapper.writeValueAsString(
                 mapOf(
@@ -93,6 +97,9 @@ class AccountLockScenarioIT {
         loginUseCase.login(LoginCommand(loginId, password, "sample-app-a", "127.0.0.1", "IT"))
 
     private fun failed(reason: LoginFailureReason) = AuthenticationResult.Failed(reason)
+
+    /** 관리자 API는 JWT로 보호된다. 토큰 발급 흐름 자체는 AuthorizationCodeFlowIT에서 검증한다. */
+    private fun adminToken() = jwt().authorities(SimpleGrantedAuthority("ROLE_ADMIN"))
 
     companion object {
         private const val PASSWORD = "Sso-Passw0rd!"

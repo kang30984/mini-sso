@@ -11,6 +11,7 @@ import java.time.Instant
 class Account private constructor(
     val id: AccountId?,
     val loginId: LoginId,
+    val role: AccountRole,
     email: Email,
     name: String,
     department: String,
@@ -122,6 +123,7 @@ class Account private constructor(
             hasher: PasswordHasher,
             policy: AccountPolicy,
             now: Instant,
+            role: AccountRole = AccountRole.USER,
         ): Account {
             val trimmedName = name.trim()
             val trimmedDepartment = department.trim()
@@ -135,6 +137,7 @@ class Account private constructor(
             return Account(
                 id = null,
                 loginId = loginId,
+                role = role,
                 email = email,
                 name = trimmedName,
                 department = trimmedDepartment,
@@ -151,6 +154,7 @@ class Account private constructor(
         fun reconstitute(
             id: AccountId,
             loginId: LoginId,
+            role: AccountRole,
             email: Email,
             name: String,
             department: String,
@@ -161,7 +165,7 @@ class Account private constructor(
             passwordChangedAt: Instant,
             lastLoginAt: Instant?,
         ): Account = Account(
-            id, loginId, email, name, department, passwordHash, status,
+            id, loginId, role, email, name, department, passwordHash, status,
             failedLoginCount, lockedUntil, passwordChangedAt, lastLoginAt,
         )
     }

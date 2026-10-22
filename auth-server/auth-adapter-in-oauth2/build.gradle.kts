@@ -4,5 +4,7 @@ plugins {
 
 dependencies {
     implementation(project(":auth-server:auth-application"))
-    // 3주차: org.springframework.boot:spring-boot-starter-oauth2-authorization-server
+    implementation("org.springframework.boot:spring-boot-starter-web")
+    implementation("org.springframework.boot:spring-boot-starter-oauth2-authorization-server")
+    implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
 }

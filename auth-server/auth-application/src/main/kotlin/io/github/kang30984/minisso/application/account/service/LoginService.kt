@@ -6,6 +6,7 @@ import io.github.kang30984.minisso.application.account.port.inbound.LoginUseCase
 import io.github.kang30984.minisso.application.account.port.outbound.LoadAccountPort
 import io.github.kang30984.minisso.application.account.port.outbound.SaveAccountPort
 import io.github.kang30984.minisso.application.history.port.outbound.SaveLoginHistoryPort
+import io.github.kang30984.minisso.domain.account.Account
 import io.github.kang30984.minisso.domain.account.AccountId
 import io.github.kang30984.minisso.domain.account.AccountPolicy
 import io.github.kang30984.minisso.domain.account.LoginId
@@ -51,21 +52,26 @@ class LoginService(
 
         return when (result) {
             is LoginResult.Rejected -> fail(command, accountId, LoginFailureReason.from(result.reason), now)
-            LoginResult.Success -> succeed(command, accountId, account.loginId, passwordChangeRequired = false, now)
-            LoginResult.PasswordChangeRequired -> succeed(command, accountId, account.loginId, passwordChangeRequired = true, now)
+            LoginResult.Success -> succeed(command, account, passwordChangeRequired = false, now)
+            LoginResult.PasswordChangeRequired -> succeed(command, account, passwordChangeRequired = true, now)
         }
     }
 
     private fun succeed(
         command: LoginCommand,
-        accountId: AccountId,
-        loginId: LoginId,
+        account: Account,
         passwordChangeRequired: Boolean,
         now: Instant,
     ): AuthenticationResult {
+        val accountId = checkNotNull(account.id)
         val outcome = if (passwordChangeRequired) LoginOutcome.PASSWORD_CHANGE_REQUIRED else LoginOutcome.SUCCESS
         record(command, accountId, outcome, null, now)
-        return AuthenticationResult.Authenticated(accountId.value, loginId.value, passwordChangeRequired)
+        return AuthenticationResult.Authenticated(
+            accountId = accountId.value,
+            loginId = account.loginId.value,
+            role = account.role.name,
+            passwordChangeRequired = passwordChangeRequired,
+        )
     }
 
     private fun fail(

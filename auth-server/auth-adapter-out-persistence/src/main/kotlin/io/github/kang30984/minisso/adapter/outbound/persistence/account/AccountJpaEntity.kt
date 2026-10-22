@@ -1,5 +1,6 @@
 package io.github.kang30984.minisso.adapter.outbound.persistence.account
 
+import io.github.kang30984.minisso.domain.account.AccountRole
 import io.github.kang30984.minisso.domain.account.AccountStatus
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
@@ -24,6 +25,11 @@ import java.time.Instant
 class AccountJpaEntity(
     @Column(nullable = false, unique = true, length = 30)
     var loginId: String,
+
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(nullable = false, length = 20)
+    var role: AccountRole,
 
     @Column(nullable = false, unique = true)
     var email: String,
