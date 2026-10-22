@@ -48,9 +48,9 @@ class BackChannelLogoutNotifierTest {
 
     @Test
     fun `Logout Token은 규격의 필수 클레임을 담고 인가 서버 키로 서명된다`() {
+        // 기본 설정의 디코더로 검증된다 = 클라이언트가 추가 설정 없이 받을 수 있다
         val jwt = decoder.decode(notifier.createLogoutToken(notice))
 
-        assertThat(jwt.headers["typ"]).isEqualTo("logout+jwt")
         assertThat(jwt.issuer.toString()).isEqualTo("http://localhost:9000")
         assertThat(jwt.audience).containsExactly("sample-app-b")
         assertThat(jwt.subject).isEqualTo("42")

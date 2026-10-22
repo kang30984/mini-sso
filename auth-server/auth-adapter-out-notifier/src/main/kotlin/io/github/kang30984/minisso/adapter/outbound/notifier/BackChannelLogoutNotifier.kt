@@ -65,10 +65,14 @@ class BackChannelLogoutNotifier(
     /**
      * Logout Token 클레임 (OIDC Back-Channel Logout 1.0, 2.4절)
      * iss, aud, iat, jti, events는 필수이고, sub와 sid 중 하나 이상이 있어야 하며, nonce는 금지된다.
+     *
+     * 규격은 typ 헤더에 "logout+jwt"를 권장(SHOULD)하지만 넣지 않는다.
+     * Nimbus 기반 디코더(Spring Security 포함)는 기본 설정에서 typ이 "JWT"이거나 없을 때만 허용하므로,
+     * 넣으면 클라이언트가 별도 설정 없이는 토큰을 거부한다. 대신 events 클레임으로 Logout Token임을 구분한다.
      */
     internal fun createLogoutToken(notice: BackChannelLogoutNotice): String {
         val now = clock.instant()
-        val header = JwsHeader.with(SignatureAlgorithm.RS256).type(LOGOUT_TOKEN_TYPE).build()
+        val header = JwsHeader.with(SignatureAlgorithm.RS256).build()
         val claims = JwtClaimsSet.builder()
             .issuer(notice.issuer)
             .audience(listOf(notice.clientId))
@@ -89,7 +93,6 @@ class BackChannelLogoutNotifier(
     companion object {
         private const val MAX_ATTEMPTS = 3
         private const val LOGOUT_TOKEN_PARAM = "logout_token"
-        private const val LOGOUT_TOKEN_TYPE = "logout+jwt"
         const val BACK_CHANNEL_LOGOUT_EVENT = "http://schemas.openid.net/event/backchannel-logout"
         private val TOKEN_LIFETIME: Duration = Duration.ofMinutes(2)
     }
