@@ -19,6 +19,7 @@ import java.text.ParseException;
 import java.time.Instant;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
@@ -43,10 +44,12 @@ public final class MiniSsoTokenVerifier {
         DefaultJWTProcessor<SecurityContext> jwtProcessor = new DefaultJWTProcessor<>();
         jwtProcessor.setJWSKeySelector(new JWSVerificationKeySelector<>(JWSAlgorithm.RS256, jwkSource));
 
+        // Nimbus는 내부에서 contains(null)을 호출하는데, Set.of/Set.copyOf로 만든 불변 Set은 이때 NPE를 던진다.
+        // 그래서 null 조회를 허용하는 HashSet으로 넘긴다.
         DefaultJWTClaimsVerifier<SecurityContext> claimsVerifier = new DefaultJWTClaimsVerifier<>(
-                settings.audiences().isEmpty() ? null : settings.audiences(),
+                settings.audiences().isEmpty() ? null : new HashSet<>(settings.audiences()),
                 new JWTClaimsSet.Builder().issuer(settings.issuer()).build(),
-                Set.of("sub", "exp", "iat"),
+                new HashSet<>(Set.of("sub", "exp", "iat")),
                 null);
         claimsVerifier.setMaxClockSkew((int) settings.clockSkew().toSeconds());
         jwtProcessor.setJWTClaimsSetVerifier(claimsVerifier);
