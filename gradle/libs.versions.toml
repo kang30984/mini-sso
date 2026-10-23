@@ -6,6 +6,10 @@ querydsl = "5.1.0"
 bouncycastle = "1.80"
 # Spring Boot BOM이 관리하지 않으므로 직접 지정한다. Spring Security가 더 높은 버전을 가져오면 Gradle이 높은 쪽으로 맞춘다.
 nimbus-jose-jwt = "9.37.3"
+# Spring Boot 3.5.6 BOM은 1.21.3을 가져오는데, 이 버전은 Docker Engine 29의 최소 API 버전(1.44)을 맞추지 못해
+# 통합 테스트가 "Could not find a valid Docker environment"로 실패한다. 1.21.4부터 최신 Docker Engine을 지원한다.
+# 통합 테스트 규약(minisso.integration-test-conventions)에서 BOM으로 적용한다. Spring Boot BOM과 겹치면 Gradle이 높은 쪽을 고른다.
+testcontainers = "1.21.4"
 
 [libraries]
 # build-logic 전용 (Gradle 플러그인)

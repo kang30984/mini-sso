@@ -82,6 +82,21 @@ http://127.0.0.1:8081 에 접속하면 인증 서버 로그인 화면으로 이�
 
 테스트는 `./gradlew build`로 전부 돌릴 수 있다. 통합 테스트는 Testcontainers를 쓰기 때문에 Docker가 켜져 있어야 한다.
 
+서버 세 개는 계속 떠 있어야 하므로 터미널을 따로 열어 하나씩 실행한다. 처음 실행할 때는 Gradle이 빌드 설정을 컴파일하고 의존성을 내려받는 동안 잠금을 잡기 때문에, 여러 터미널에서 동시에 시작하면 나머지가 `Timeout waiting to lock build logic queue`로 실패한다. 인증 서버가 `Started MiniSsoApplicationKt`까지 뜬 것을 보고 샘플 앱을 실행하거나, 먼저 `./gradlew assemble`로 한 번 빌드해 두면 된다.
+
+### Windows (명령 프롬프트)
+
+명령 프롬프트에서는 `./gradlew` 대신 `gradlew`를 쓰고, `--args`는 큰따옴표로 감싼다. `#` 뒤의 설명은 주석으로 인식되지 않으므로 같이 붙여 넣지 않는다. Docker Desktop이 실행 중(Engine running)이어야 하고, `JAVA_HOME`이 JDK 21을 가리켜야 한다.
+
+```bat
+docker compose up -d
+gradlew :auth-server:auth-bootstrap:bootRun --args="--spring.profiles.active=local"
+gradlew :samples:sample-app-a:bootRun
+gradlew :samples:sample-app-b:bootRun
+```
+
+실행 중 막혔던 문제는 [트러블슈팅 9번](docs/troubleshooting.md#9-최신-docker-desktop에서-통합-테스트가-docker를-찾지-못함)에 정리했다.
+
 ## 구현하면서 고민한 것들
 
 ### 로그인
@@ -188,7 +203,7 @@ k6로 시나리오 네 개(전체 로그인 흐름, 토큰 갱신, SDK로 보호
 
 ## 트러블슈팅
 
-CI와 부하 테스트에서 실제로 막혔던 문제 8건을 [docs/troubleshooting.md](docs/troubleshooting.md)에 정리했다. 테스트가 엉뚱한 이유로 통과하고 있던 일이나, 규격이 권장하는 방식대로 했더니 라이브러리가 토큰을 거부한 일 같은 것들이다.
+CI와 부하 테스트, 로컬 실행에서 실제로 막혔던 문제 9건을 [docs/troubleshooting.md](docs/troubleshooting.md)에 정리했다. 테스트가 엉뚱한 이유로 통과하고 있던 일이나, 규격이 권장하는 방식대로 했더니 라이브러리가 토큰을 거부한 일 같은 것들이다.
 
 ## 아직 남은 것
 

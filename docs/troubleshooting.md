@@ -69,3 +69,13 @@ Spring Boot BOM이 버전을 관리해 줄 거라고 생각하고 버전 없이 
 부하 테스트 시나리오도 같이 고쳤다. 가상 사용자 전원이 계정 하나로 로그인하던 걸 계정 100개로 나눴다. 실제로는 없는 경합이 측정 결과를 흐리기 때문이다.
 
 단위 테스트와 통합 테스트는 순서대로 하나씩 돌기 때문에 이런 동시성 문제를 잡지 못했다. 성능을 재려고 돌린 부하 테스트가 결과적으로 동시성 버그를 찾아 준 셈이다.
+
+## 9. 최신 Docker Desktop에서 통합 테스트가 Docker를 찾지 못함
+
+Windows에서 최신 Docker Desktop으로 `gradlew build`를 돌렸더니 통합 테스트가 테스트 메서드를 하나도 실행하지 못하고 `initializationError`로 실패했다. 원인은 `IllegalStateException: Could not find a valid Docker environment`였다. `docker compose up -d`는 잘 되는데 Testcontainers만 Docker에 붙지 못했다.
+
+Docker Engine 29부터 데몬이 받아 주는 최소 API 버전이 1.44로 올라갔는데, Spring Boot 3.5.6 BOM이 가져오는 Testcontainers 1.21.3은 그보다 낮은 버전(1.32)으로 요청을 보낸다. 데몬이 요청을 거부하니 Testcontainers는 "쓸 수 있는 Docker 환경이 없다"고 판단한다. 그 뒤에 나오는 `lateinit property connectionFactory has not been initialized`는 컨테이너가 안 뜬 상태에서 정리 메서드가 돌면서 생긴 부수적인 오류다. 진짜 원인은 테스트 리포트의 Standard output 탭에 있는 `client version 1.32 is too old` 메시지에서 확인할 수 있다.
+
+Testcontainers 1.21.4가 최신 Docker Engine을 지원하므로, 버전 카탈로그에 버전을 명시하고 통합 테스트 규약에서 `testcontainers-bom`을 플랫폼으로 추가했다. Spring Boot BOM의 1.21.3과 겹치지만 Gradle이 높은 쪽을 고른다. Spring Boot를 Testcontainers 1.21.4 이상을 관리하는 버전으로 올리면 이 설정은 지워도 된다.
+
+코드를 바꿀 수 없는 상황이라면 사용자 홈 디렉터리의 `.docker-java.properties`에 `api.version=1.44`를 넣어 요청 버전을 강제하는 방법도 있다. 다만 이건 PC마다 따로 해 줘야 해서 근본적인 해결은 아니다.
