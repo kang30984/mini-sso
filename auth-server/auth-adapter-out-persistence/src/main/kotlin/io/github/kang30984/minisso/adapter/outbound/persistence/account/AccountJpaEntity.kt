@@ -13,6 +13,7 @@ import jakarta.persistence.Table
 import jakarta.persistence.Version
 import org.hibernate.annotations.CreationTimestamp
 import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.annotations.OptimisticLock
 import org.hibernate.annotations.UpdateTimestamp
 import org.hibernate.type.SqlTypes
 import java.time.Instant
@@ -57,6 +58,11 @@ class AccountJpaEntity(
     @Column(nullable = false)
     var passwordChangedAt: Instant,
 
+    /**
+     * 로그인 성공 시마다 바뀌는 값이라 낙관적 락 대상에서 제외한다 (ADR-011).
+     * 같은 계정으로 동시에 로그인해도 서로 충돌하지 않고, 마지막에 커밋한 시각이 남는다.
+     */
+    @OptimisticLock(excluded = true)
     var lastLoginAt: Instant?,
 ) {
     @Id
@@ -71,6 +77,7 @@ class AccountJpaEntity(
     var createdAt: Instant? = null
 
     @UpdateTimestamp
+    @OptimisticLock(excluded = true)
     @Column(nullable = false)
     var updatedAt: Instant? = null
 }

@@ -38,6 +38,10 @@ minisso:
     retention: 1h
     # 인스턴스별 서명 키 캐시. 다른 인스턴스의 키 교체가 반영되는 최대 지연이다.
     cache-ttl: 30s
+  # 클라이언트 인증 시 검증에 성공한 시크릿을 잠시 기억해 Argon2 반복을 줄인다 (ADR-012)
+  client-secret-cache:
+    enabled: true
+    ttl: 10m
   login:
     # IP당 로그인 시도 제한 (credential stuffing, Argon2 CPU 고갈 공격 방어)
     max-attempts-per-ip: 20

@@ -12,6 +12,11 @@ on:
       duration:
         description: "시나리오별 측정 시간"
         default: "60s"
+      client_secret_cache:
+        description: "검증된 클라이언트 시크릿 캐시 (ADR-012). false로 두면 개선 전 상태를 측정한다"
+        type: choice
+        options: ["true", "false"]
+        default: "true"
 
 jobs:
   load-test:
@@ -38,7 +43,8 @@ jobs:
         run: |
           AUTH_JAR=$(ls auth-server/auth-bootstrap/build/libs/*.jar | grep -v plain)
           APP_B_JAR=$(ls samples/sample-app-b/build/libs/*.jar | grep -v plain)
-          nohup java -Xms512m -Xmx1g -jar "$AUTH_JAR" --spring.profiles.active=local,loadtest > auth-server.log 2>&1 &
+          nohup java -Xms512m -Xmx1g -jar "$AUTH_JAR" --spring.profiles.active=local,loadtest \
+            --minisso.client-secret-cache.enabled=${{ inputs.client_secret_cache }} > auth-server.log 2>&1 &
           for i in $(seq 1 60); do curl -sf localhost:9000/actuator/health && break; sleep 2; done
           nohup java -Xms256m -Xmx512m -jar "$APP_B_JAR" > sample-app-b.log 2>&1 &
           for i in $(seq 1 60); do curl -sf 127.0.0.1:8082/api/public/status && break; sleep 2; done
@@ -51,7 +57,7 @@ jobs:
             echo "- 커밋: \`${GITHUB_SHA::7}\`"
             echo "- 러너: $(nproc) vCPU, $(free -g | awk '/Mem:/{print $2}')GB RAM (GitHub ubuntu-latest, 모든 구성요소가 한 대에서 실행)"
             echo "- JVM: $(java -version 2>&1 | head -1)"
-            echo "- 설정: VUs=${{ inputs.vus }}, 측정 시간=${{ inputs.duration }}"
+            echo "- 설정: VUs=${{ inputs.vus }}, 측정 시간=${{ inputs.duration }}, 테스트 계정 100개, 클라이언트 시크릿 캐시=${{ inputs.client_secret_cache }}"
             echo ""
           } >> "$GITHUB_STEP_SUMMARY"
 

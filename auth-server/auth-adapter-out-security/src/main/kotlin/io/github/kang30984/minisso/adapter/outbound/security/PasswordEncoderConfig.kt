@@ -1,24 +1,36 @@
 package io.github.kang30984.minisso.adapter.outbound.security
 
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.security.crypto.argon2.Argon2PasswordEncoder
 import org.springframework.security.crypto.password.DelegatingPasswordEncoder
 import org.springframework.security.crypto.password.PasswordEncoder
+import java.time.Duration
 
 /**
- * 계정 비밀번호와 OAuth 클라이언트 시크릿에 같은 인코더를 쓴다.
- * Spring Authorization Server는 이 빈으로 클라이언트 시크릿을 검증한다.
+ * 이 빈은 Spring Authorization Server가 클라이언트 시크릿을 검증할 때 쓴다.
  * 빈이 없으면 bcrypt 기본 인코더가 쓰여, argon2 해시를 "업그레이드 대상"으로 판단하고 클라이언트를 다시 저장하려 한다.
+ *
+ * 계정 비밀번호는 이 빈을 쓰지 않고 Argon2PasswordHasher가 캐시 없는 인코더를 직접 쓴다.
  */
 @Configuration(proxyBeanMethods = false)
 class PasswordEncoderConfig {
 
     @Bean
-    fun passwordEncoder(): PasswordEncoder = create()
+    fun passwordEncoder(
+        @Value("\${minisso.client-secret-cache.enabled:true}") cacheEnabled: Boolean,
+        @Value("\${minisso.client-secret-cache.ttl:10m}") cacheTtl: Duration,
+    ): PasswordEncoder =
+        if (cacheEnabled) {
+            VerifiedSecretCachingPasswordEncoder(create(), cacheTtl, MAX_CACHED_CLIENTS)
+        } else {
+            create()
+        }
 
     companion object {
         private const val ARGON2_ID = "argon2"
+        private const val MAX_CACHED_CLIENTS = 10_000
 
         fun create(): PasswordEncoder = DelegatingPasswordEncoder(
             ARGON2_ID,

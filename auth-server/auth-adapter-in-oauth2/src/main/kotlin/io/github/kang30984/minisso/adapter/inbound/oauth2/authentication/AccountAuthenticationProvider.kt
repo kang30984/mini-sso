@@ -4,7 +4,9 @@ import io.github.kang30984.minisso.application.account.port.inbound.Authenticati
 import io.github.kang30984.minisso.application.account.port.inbound.LoginCommand
 import io.github.kang30984.minisso.application.account.port.inbound.LoginUseCase
 import io.github.kang30984.minisso.domain.history.LoginFailureReason
+import org.springframework.dao.OptimisticLockingFailureException
 import org.springframework.security.authentication.AuthenticationProvider
+import org.springframework.security.authentication.AuthenticationServiceException
 import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.security.authentication.DisabledException
 import org.springframework.security.authentication.LockedException
@@ -23,15 +25,14 @@ class AccountAuthenticationProvider(
 
     override fun authenticate(authentication: Authentication): Authentication {
         val details = authentication.details as? LoginRequestDetails
-        val result = loginUseCase.login(
-            LoginCommand(
-                loginId = authentication.name,
-                password = authentication.credentials?.toString().orEmpty(),
-                clientId = details?.clientId,
-                ip = details?.ip ?: UNKNOWN_IP,
-                userAgent = details?.userAgent,
-            ),
+        val command = LoginCommand(
+            loginId = authentication.name,
+            password = authentication.credentials?.toString().orEmpty(),
+            clientId = details?.clientId,
+            ip = details?.ip ?: UNKNOWN_IP,
+            userAgent = details?.userAgent,
         )
+        val result = loginWithRetry(command)
 
         return when (result) {
             is AuthenticationResult.Authenticated ->
@@ -42,6 +43,26 @@ class AccountAuthenticationProvider(
                 ).apply { this.details = authentication.details }
 
             is AuthenticationResult.Failed -> throw toException(result.reason)
+        }
+    }
+
+    /**
+     * 같은 계정의 실패 횟수를 동시에 갱신하면 낙관적 락이 충돌한다 (ADR-011).
+     * 트랜잭션 밖인 이곳에서 한 번 재시도해 최신 상태로 다시 판단하고,
+     * 그래도 충돌하면 500 대신 인증 실패로 응답한다.
+     */
+    private fun loginWithRetry(command: LoginCommand): AuthenticationResult {
+        repeat(MAX_ATTEMPTS - 1) {
+            try {
+                return loginUseCase.login(command)
+            } catch (e: OptimisticLockingFailureException) {
+                // 다음 시도에서 최신 계정 상태를 다시 읽는다
+            }
+        }
+        return try {
+            loginUseCase.login(command)
+        } catch (e: OptimisticLockingFailureException) {
+            throw AuthenticationServiceException("요청이 몰려 로그인을 처리하지 못했습니다. 다시 시도하세요.", e)
         }
     }
 
@@ -68,5 +89,6 @@ class AccountAuthenticationProvider(
 
     companion object {
         private const val UNKNOWN_IP = "unknown"
+        private const val MAX_ATTEMPTS = 2
     }
 }

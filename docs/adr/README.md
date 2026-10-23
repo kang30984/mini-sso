@@ -14,3 +14,5 @@
 | [008](008-signing-key-rotation.md) | 서명 키 무중단 교체 | 승인 |
 | [009](009-login-history-without-fk.md) | 로그인 이력 테이블에 계정 FK를 두지 않음 | 승인 |
 | [010](010-first-party-clients-pkce.md) | 1st-party 클라이언트는 동의 화면 생략, PKCE는 기밀 클라이언트에도 필수 | 승인 |
+| [011](011-concurrent-login-optimistic-lock.md) | 같은 계정의 동시 로그인과 낙관적 락 | 승인 |
+| [012](012-verified-client-secret-cache.md) | 검증된 클라이언트 시크릿 캐시 | 승인 |

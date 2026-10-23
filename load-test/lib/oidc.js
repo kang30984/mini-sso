@@ -5,7 +5,9 @@ import crypto from 'k6/crypto';
 import encoding from 'k6/encoding';
 import { check, fail } from 'k6';
 import { Trend } from 'k6/metrics';
-import { AUTH_SERVER, CLIENT_ID, CLIENT_SECRET, PASSWORD, REDIRECT_URI, USERNAME } from './config.js';
+import {
+  ADMIN_PASSWORD, ADMIN_USERNAME, AUTH_SERVER, CLIENT_ID, CLIENT_SECRET, REDIRECT_URI, USER_COUNT, USER_PASSWORD,
+} from './config.js';
 
 export const steps = {
   authorize: new Trend('step_authorize', true),
@@ -55,7 +57,7 @@ function queryParam(url, name) {
 }
 
 /** 로그인부터 토큰 발급까지. 반환: 토큰 응답 JSON */
-export function loginAndIssueTokens() {
+export function loginAndIssueTokens(username = ADMIN_USERNAME, password = ADMIN_PASSWORD) {
   http.cookieJar().clear(AUTH_SERVER);
   const verifier = randomVerifier();
   const challenge = crypto.sha256(verifier, 'base64rawurl');
@@ -73,7 +75,7 @@ export function loginAndIssueTokens() {
   if (!check(csrf, { 'csrf token': (v) => !!v })) fail('no csrf token');
 
   // 3. 로그인 (Argon2 비밀번호 비교, 세션 생성)
-  res = http.post(`${AUTH_SERVER}/login`, { username: USERNAME, password: PASSWORD, _csrf: csrf },
+  res = http.post(`${AUTH_SERVER}/login`, { username, password, _csrf: csrf },
     Object.assign({ tags: { name: 'login' } }, NO_REDIRECT));
   steps.login.add(res.timings.duration);
   const afterLogin = res.headers.Location || '';
@@ -110,4 +112,23 @@ export function refresh(refreshToken) {
   }, { headers: { Authorization: basicAuth() }, tags: { name: 'token_refresh' } });
   steps.refresh.add(res.timings.duration);
   return check(res, { 'refreshed': (r) => r.status === 200 }) ? res.json() : null;
+}
+
+/** 관리자로 로그인해 부하 테스트용 계정을 만든다. 이미 있으면(409) 건너뛴다. setup()에서 호출한다. */
+export function createLoadTestUsers() {
+  const adminToken = loginAndIssueTokens().access_token;
+  for (let i = 1; i <= USER_COUNT; i++) {
+    const loginId = `load.user${i}`;
+    const res = http.post(`${AUTH_SERVER}/api/admin/v1/accounts`, JSON.stringify({
+      loginId,
+      email: `${loginId}@example.com`,
+      name: `부하테스트${i}`,
+      department: '부하테스트',
+      initialPassword: USER_PASSWORD,
+    }), {
+      headers: { Authorization: `Bearer ${adminToken}`, 'Content-Type': 'application/json' },
+      tags: { name: 'setup_create_user' },
+    });
+    if (res.status !== 201 && res.status !== 409) fail(`create ${loginId}: ${res.status} ${res.body}`);
+  }
 }

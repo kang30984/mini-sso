@@ -211,8 +211,23 @@ fun teamReports(@CurrentUser user: AuthUser) = ...
 
 k6 시나리오 4개(로그인 전체 흐름, 토큰 갱신, SDK로 보호되는 API, 기준선)를 GitHub Actions에서 같은 환경으로 실행합니다. 실행 방법은 [load-test/README.md](load-test/README.md)를 참고하세요.
 
-> 측정 결과와 병목 분석, 개선 전후 비교를 정리하는 중입니다.
+### 1차 측정에서 발견한 문제
+
+GitHub Actions 러너 1대(MySQL, Redis, 인증 서버, 샘플 앱, k6를 모두 실행), 가상 사용자 20명 기준입니다.
+
+| 시나리오 | 처리량 | 평균 지연 | 실패율 |
+|---|---|---|---|
+| 기준선 (JWKS) | 8,704 req/s | 5.6ms | 0% |
+| 전체 로그인 흐름 | 19.2 회/s | 918ms | **26.5%** |
+| 토큰 갱신 | 23.4 회/s | 823ms (갱신 요청) | 6.8% |
+| SDK로 보호되는 API | 3,934 req/s | 12.5ms | 0% |
+
+1. **동시 로그인 충돌 (버그)**: 실패는 모두 같은 계정의 낙관적 락 충돌이었고, 500으로 노출되고 있었습니다. → [ADR-011](docs/adr/011-concurrent-login-optimistic-lock.md)
+2. **토큰 요청마다 Argon2 (병목)**: 비밀번호 비교가 없는 토큰 갱신이 로그인만큼 느렸습니다(823ms). 클라이언트 시크릿 검증이 원인이며, Argon2가 CPU를 점유해 Argon2가 없는 단계(인가 요청 약 150ms)까지 기준선의 약 30배로 느려졌습니다. → [ADR-012](docs/adr/012-verified-client-secret-cache.md)
+3. **로컬 검증의 효과 (확인)**: SDK로 보호되는 API는 인증 서버를 호출하지 않아, 인증 서버가 포화 상태였던 같은 환경에서도 3,934 req/s, 평균 12.5ms를 유지했습니다. → [ADR-005](docs/adr/005-local-jwt-verification.md)
+
+> 개선 후 측정 결과를 정리하는 중입니다.
 
 ## 트러블슈팅
 
-CI에서 실제로 겪은 문제 7건의 원인과 해결 과정을 [docs/troubleshooting.md](docs/troubleshooting.md)에 정리했습니다. 예: 테스트가 엉뚱한 이유로 통과하던 문제, 규격 권장 사항과 라이브러리 호환성이 충돌한 문제.
+CI와 부하 테스트에서 실제로 겪은 문제 8건의 원인과 해결 과정을 [docs/troubleshooting.md](docs/troubleshooting.md)에 정리했습니다. 예: 테스트가 엉뚱한 이유로 통과하던 문제, 규격 권장 사항과 라이브러리 호환성이 충돌한 문제.
