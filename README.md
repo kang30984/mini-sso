@@ -11,16 +11,8 @@
 - 리프레시 토큰 재사용 탐지, 서명 키 무중단 교체, 로그인 시도 제한
 - 서비스용 SDK: 의존성 1줄 + 설정 3줄로 토큰 검증 (샘플 앱 B는 보안 코드 0줄)
 - 부하 테스트로 동시 로그인 버그를 찾아 수정하고, 토큰 갱신 처리량을 **12배** 개선 ([성능](#성능))
-- 헥사고날 + Gradle 멀티모듈 13개, ArchUnit으로 의존 규칙 강제, ADR 12건, [트러블슈팅 기록](docs/troubleshooting.md) 8건
-
-## 핵심 목표
-
-- OAuth2 Authorization Code + PKCE, OIDC 기반 SSO (서로 다른 오리진의 서비스 간 자동 로그인)
-- Refresh Token Rotation과 재사용 탐지 시 토큰 계보 전체 폐기
-- 무중단 서명키 로테이션, Back-Channel Logout
-- 의존성 1줄과 설정 3줄로 동작하는 Spring Boot Starter SDK
-- 헥사고날 아키텍처를 멀티모듈과 ArchUnit으로 강제
-- k6 부하 테스트 결과를 수치로 기록
+- 헥사고날 + Gradle 멀티모듈 13개, ArchUnit으로 의존 규칙 강제
+- 테스트 메서드 129개 (단위 · Testcontainers 통합 · 아키텍처 · 동시성), ADR 12건, [트러블슈팅 기록](docs/troubleshooting.md) 8건
 
 ## 기술 스택
 
@@ -30,8 +22,8 @@
 | 프레임워크 | Spring Boot 3.5, Spring Security 6, Spring Authorization Server |
 | 데이터 | MySQL 8.4, JPA, QueryDSL, Redis 7 |
 | 빌드 | Gradle Kotlin DSL, Convention Plugin, Version Catalog |
-| 테스트 | JUnit 5, Testcontainers, ArchUnit, WireMock, k6 |
-| CI/CD | GitLab CI/CD (주), GitHub Actions (보조) |
+| 테스트 | JUnit 5, AssertJ, Testcontainers, ArchUnit, MockMvc, k6 |
+| CI/CD | GitHub Actions (빌드·테스트, 수동 부하 테스트), `.gitlab-ci.yml` (같은 단계 정의, Docker-in-Docker로 Testcontainers 실행) |
 
 ## 아키텍처
 
@@ -56,12 +48,12 @@ flowchart TD
 |---|---|
 | `auth-domain` | 계정·세션·서명키 도메인 규칙 (프레임워크 의존 없음) |
 | `auth-application` | 유스케이스와 포트 |
-| `auth-adapter-in-web` | REST API, 로그인 페이지 |
-| `auth-adapter-in-oauth2` | Spring Authorization Server 연동 |
+| `auth-adapter-in-web` | 관리자 REST API, ProblemDetail 오류 응답 |
+| `auth-adapter-in-oauth2` | Spring Authorization Server 연동, 로그인 폼, 보안 필터 체인 |
 | `auth-adapter-out-persistence` | JPA / QueryDSL |
 | `auth-adapter-out-redis` | SSO 세션, 인가 상태, Rate Limit |
 | `auth-adapter-out-notifier` | Back-Channel Logout 발송 |
-| `auth-adapter-out-security` | Argon2id 비밀번호 해시 |
+| `auth-adapter-out-security` | Argon2id 해시, 서명 키 생성·암호화, 클라이언트 시크릿 검증 캐시 |
 | `auth-bootstrap` | 실행 진입점, 빈 조립, 아키텍처 테스트 |
 | `auth-sdk-core` | Spring 의존 없는 JWT 검증 (JWKS 캐시·재조회·장애 허용) |
 | `auth-sdk-spring-boot-starter` | AutoConfiguration 기반 SDK (`@CurrentUser`, `@RequiresScope`, ProblemDetail) |
@@ -95,21 +87,23 @@ docker compose up -d                                                          # 
 
 인증 서버와 샘플 앱은 일부러 다른 호스트(`localhost` / `127.0.0.1`)로 띄워 쿠키를 공유하지 않는 상태에서 SSO가 동작함을 보여줍니다.
 
-테스트
+**테스트**
 
 ```bash
 ./gradlew test               # 단위 테스트 + ArchUnit
 ./gradlew integrationTest    # Testcontainers 통합 테스트 (Docker 필요)
+./gradlew build              # 전체 (CI와 동일)
 ```
 
-## 로드맵
-
-- [x] 1주차: 멀티모듈 골격, Convention Plugin, docker-compose, CI, 아키텍처 테스트
-- [x] 2주차: 계정 도메인, JPA/QueryDSL 어댑터, 계정 API
-- [x] 3주차: Spring Authorization Server 연동, Authorization Code + PKCE, OIDC
-- [x] 4주차: Redis SSO 세션, Refresh Token 회전·재사용 탐지, 로그아웃
-- [x] 5주차: SDK core·starter, 서명키 로테이션, 샘플 앱 2개
-- [x] 6주차: 로그인 시도 제한, k6 부하 테스트, 동시 로그인 버그 수정, 토큰 갱신 처리량 12배 개선, 트러블슈팅 문서
+| 종류 | 대표 테스트 | 검증 내용 |
+|---|---|---|
+| 도메인 단위 | `AccountTest`, `OAuthClientTest` | 잠금 정책, 비밀번호 정책, 리다이렉트 URI 정책 |
+| 유스케이스 | `LoginServiceTest`, `SigningKeyServiceTest` | 가짜 포트로 시나리오 검증 (Spring 없음) |
+| 어댑터 통합 | `*PersistenceAdapterIT`, `RedisOAuth2AuthorizationServiceIT` | 실제 MySQL·Redis (Testcontainers) |
+| OIDC 흐름 | `AuthorizationCodeFlowIT` | 인가 코드 + PKCE, SSO, 토큰 회전·재사용 탐지, 로그아웃 |
+| 키 교체 | `KeyRotationIT` | 실제 JWKS를 SDK로 조회해 교체 전후 토큰 모두 검증 |
+| 동시성 | `ConcurrentLoginIT` | 같은 계정 동시 로그인 (부하 테스트에서 발견한 버그의 회귀 테스트) |
+| 아키텍처 | `HexagonalArchitectureTest` | 도메인의 프레임워크 의존 금지, 어댑터 간 의존 금지 |
 
 ## 구현 하이라이트
 
@@ -120,7 +114,7 @@ docker compose up -d                                                          # 
 
 **계정 존재 여부 노출 방지**
 - 존재하지 않는 계정에도 실제 Argon2 해시 비교를 수행해 응답 시간 차이를 줄임
-- 실패 사유는 감사 이력에만 남기고, 사용자 메시지는 통일 (3주차 로그인 화면)
+- 실패 사유는 감사 이력에만 남기고, 사용자 메시지는 통일
 
 **실패도 커밋되는 로그인**
 - 로그인 실패를 예외가 아닌 결과값으로 반환. 예외로 처리하면 트랜잭션 롤백으로 실패 횟수와 이력이 사라지기 때문
@@ -260,3 +254,27 @@ GitHub Actions 러너 1대(MySQL, Redis, 인증 서버, 샘플 앱, k6를 모두
 ## 트러블슈팅
 
 CI와 부하 테스트에서 실제로 겪은 문제 8건의 원인과 해결 과정을 [docs/troubleshooting.md](docs/troubleshooting.md)에 정리했습니다. 예: 테스트가 엉뚱한 이유로 통과하던 문제, 규격 권장 사항과 라이브러리 호환성이 충돌한 문제.
+
+## 알려진 한계와 다음 과제
+
+운영 환경으로 가져가려면 아래가 더 필요합니다. 각 항목의 배경은 링크한 ADR에 있습니다.
+
+- **다중 인스턴스의 세션 레지스트리**: Spring Authorization Server가 `sid` 계산에 쓰는 `SessionRegistry`가 메모리 구현이라, 여러 인스턴스에서는 Spring Session 인덱스 저장소 기반으로 바꿔야 합니다 ([ADR-004](docs/adr/004-authorization-state-in-redis.md))
+- **액세스 토큰 즉시 회수 불가**: 로컬 검증의 대가로 이미 발급된 액세스 토큰은 최대 10분 유효합니다. 고위험 API는 Introspection 병행을 검토합니다 ([ADR-005](docs/adr/005-local-jwt-verification.md))
+- **서명 키 사전 게시와 정기 교체**: 새 키를 먼저 게시하고 일정 시간 뒤 서명에 쓰는 단계, 교체 스케줄러 ([ADR-008](docs/adr/008-signing-key-rotation.md))
+- **인가 상태 직렬화**: JDK 직렬화라 클래스 구조가 바뀌는 배포에서 인가 상태가 초기화될 수 있습니다 ([ADR-004](docs/adr/004-authorization-state-in-redis.md))
+- **운영 기능**: 클라이언트 등록 API(현재는 기동 설정), 로그인 이력 보존 기간 정책, SDK 공개 API 호환성 검사(japicmp), 토큰 검증 메트릭
+- **GitLab 파이프라인**: `.gitlab-ci.yml`은 작성해 두었고, 실제로 매 커밋 실행되는 파이프라인은 GitHub Actions입니다
+
+## 개발 기록
+
+설계 문서의 마일스톤에 따라 6단계로 나눠 진행했습니다. 단계마다 CI 통과를 완료 기준으로 삼았습니다.
+
+| 단계 | 내용 |
+|---|---|
+| 1 | 멀티모듈 골격, Convention Plugin, docker-compose, CI, 아키텍처 테스트 |
+| 2 | 계정 도메인(잠금·비밀번호 정책), JPA/QueryDSL 어댑터, 관리자 계정 API |
+| 3 | Spring Authorization Server 연동, Authorization Code + PKCE, OIDC, 관리자 API 보호 |
+| 4 | Redis 인가 저장소·SSO 세션, 리프레시 토큰 회전·재사용 탐지, RP-Initiated / Back-Channel Logout |
+| 5 | SDK core·starter, 서명 키 무중단 교체, 샘플 앱 2개 |
+| 6 | 로그인 시도 제한, k6 부하 테스트, 동시 로그인 버그 수정, 토큰 갱신 처리량 12배 개선 |

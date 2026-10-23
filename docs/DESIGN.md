@@ -1,7 +1,9 @@
 # mini-sso 설계 문서
 
 > 그룹사 임직원 포털용 **SSO 인증 서버 + 공통 인증 SDK**를 축소 재현한 프로젝트
-> Java 21 / Kotlin · Spring Boot 3.x · Spring Authorization Server · Hexagonal · JPA/QueryDSL · Redis · GitLab CI/CD
+> Java 21 / Kotlin · Spring Boot 3.x · Spring Authorization Server · Hexagonal · JPA/QueryDSL · Redis · GitHub Actions / GitLab CI
+
+> 개발 전에 작성한 설계 문서입니다. 구현하면서 달라진 부분은 해당 절에 **[구현]** 으로 표시했고, 결정 이유는 [ADR](adr/README.md)에 있습니다.
 
 ---
 
@@ -42,14 +44,14 @@
 ```mermaid
 flowchart LR
     U[임직원 브라우저]
-    subgraph Auth["auth.localhost"]
+    subgraph Auth["localhost:9000"]
         AS[mini-sso 인증 서버]
     end
-    subgraph SvcA["app-a.localhost"]
-        A[sample-app-a<br/>Java + SDK]
+    subgraph SvcA["127.0.0.1:8081"]
+        A[sample-app-a<br/>Java 웹 서비스]
     end
-    subgraph SvcB["app-b.localhost"]
-        B[sample-app-b<br/>Kotlin + SDK]
+    subgraph SvcB["127.0.0.1:8082"]
+        B[sample-app-b<br/>Kotlin API + SDK]
     end
     DB[(MySQL 8)]
     R[(Redis 7)]
@@ -437,9 +439,9 @@ core를 분리한 이유: Spring이 아닌 배치나 게이트웨이에서도 �
 
 1. **오버라이드 가능**: 모든 빈은 `@ConditionalOnMissingBean`. 서비스가 자체 `SecurityFilterChain`을 정의하면 SDK 기본값은 물러난다.
 2. **공개 API 최소화**: 공개 패키지는 `api`, 나머지는 `internal`. 공개 타입은 `AuthUser`, `@CurrentUser`, `@RequiresScope`, `MiniSsoProperties` 정도로 제한.
-3. **하위 호환성**: SemVer 준수. 공개 API 변경은 japicmp 플러그인으로 CI에서 검출해 Major 변경 없이 깨지면 빌드 실패.
+3. **하위 호환성**: SemVer 준수. 공개 API 변경은 japicmp 플러그인으로 CI에서 검출해 Major 변경 없이 깨지면 빌드 실패. **[구현]** 공개 API를 `api` 패키지로 분리하는 데까지 적용했고, japicmp 검사는 SDK를 배포하는 시점의 과제로 남겼다.
 4. **장애 격리**: JWKS 조회 실패 시 캐시된 키로 계속 검증. 모르는 `kid`가 오면 재조회하되 최소 간격(예: 30초)을 둬 인증 서버로 요청 폭주를 막는다.
-5. **관측 가능성**: Micrometer 메트릭 (`minisso.token.verify{result=success|expired|invalid}`), 실패 사유 디버그 로그.
+5. **관측 가능성**: Micrometer 메트릭 (`minisso.token.verify{result=success|expired|invalid}`), 실패 사유 디버그 로그. **[구현]** 실패 사유는 `TokenVerificationException.Reason`으로 구분해 응답·로그에 쓰고, 메트릭은 다음 과제로 남겼다.
 6. **설정 검증**: `@Validated` 프로퍼티로 issuer 누락 시 기동 실패 (런타임이 아닌 기동 시점에 오류 발견).
 
 ### 9.4 AutoConfiguration 구성
@@ -478,12 +480,14 @@ MiniSsoAutoConfiguration
 
 | 계층 | 도구 | 대상 |
 |---|---|---|
-| 도메인 단위 | JUnit 5, Kotest assertions | 잠금 정책, 상태 전이 (Spring 없이) |
+| 도메인 단위 | JUnit 5, AssertJ | 잠금 정책, 상태 전이 (Spring 없이) |
 | 유스케이스 | Fake 포트 구현체 | 로그인·로그아웃·키 로테이션 시나리오 |
 | 어댑터 통합 | Testcontainers (MySQL, Redis) | JPA 매핑, QueryDSL 조회, Redis TTL·원자성 |
 | 아키텍처 | ArchUnit | 4.1의 의존 규칙 |
-| SDK | WireMock (JWKS 서버 모킹) | 키 로테이션, 모르는 kid, JWKS 장애 시 동작 |
-| E2E | Spring Boot Test + MockMvc / HtmlUnit | 샘플 앱 기준 SSO 전체 흐름 |
+| SDK | 고정 JWKS(`ImmutableJWKSet`), `ApplicationContextRunner` | 서명·클레임 검증 실패 사유, 자동 구성 조건 |
+| SDK + 인가 서버 | 실제 JWKS 엔드포인트 (`KeyRotationIT`) | 키 교체 전후 토큰 검증, 모르는 kid 재조회 |
+| E2E | Spring Boot Test + MockMvc (쿠키를 주고받는 브라우저 흐름 재현) | 인가 코드 + PKCE, SSO, 토큰 회전·재사용 탐지, 로그아웃 |
+| 동시성 | 스레드 풀 + `CountDownLatch` (`ConcurrentLoginIT`) | 같은 계정 동시 로그인 |
 | 부하 | k6 | 토큰 발급, SDK 토큰 검증 처리량 |
 
 부하 테스트는 측정 환경(CPU, 메모리, 컨테이너 설정)과 함께 p95 응답시간, TPS를 기록하고, 병목을 찾아 개선한 전후 비교를 최소 1건 남긴다. 예: JWKS 캐시 적용 전후, 인가 상태 저장소 MySQL 대비 Redis 비교.
@@ -497,7 +501,7 @@ stages: [build, test, quality, package, publish]
 build:        ./gradlew assemble
 unit-test:    ./gradlew test -x integrationTest
 integration:  docker:dind 서비스 + Testcontainers / ./gradlew integrationTest
-quality:      spotless 검사, ArchUnit, japicmp (SDK 공개 API 호환성)
+quality:      spotless 검사, ArchUnit, japicmp (SDK 공개 API 호환성)   # [구현] ArchUnit은 test 단계에 포함, 나머지는 미적용
 package:      bootJar + Docker 이미지 빌드 → GitLab Container Registry
 publish-sdk:  태그(v*) 푸시 시에만 SDK를 GitLab Package Registry에 배포
 ```
@@ -505,6 +509,7 @@ publish-sdk:  태그(v*) 푸시 시에만 SDK를 GitLab Package Registry에 배�
 - Gradle 캐시와 테스트 리포트(JUnit XML)를 아티팩트로 저장해 MR 화면에서 결과 확인
 - 저장소는 GitHub에 두고 GitLab.com 프로젝트로 미러링해 파이프라인을 실제로 실행. README에 파이프라인 배지와 링크를 건다.
 - GitHub에서도 커밋 단위 결과를 볼 수 있도록 `.github/workflows/ci.yml`을 보조로 둔다.
+- **[구현]** 실제로 매 커밋 실행되는 파이프라인은 GitHub Actions다 (빌드·단위·통합 테스트, 수동 실행 부하 테스트). `.gitlab-ci.yml`은 같은 단계(빌드 → 테스트(Docker-in-Docker로 Testcontainers) → 패키지)로 작성해 두었고, GitLab 미러링은 적용하지 않았다.
 
 ## 13. 마일스톤 (6주)
 
