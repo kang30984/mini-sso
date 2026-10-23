@@ -60,7 +60,11 @@ class AccountAuthenticationProvider(
 
         LoginFailureReason.LOCKED -> LockedException("로그인 실패가 반복되어 계정이 잠겼습니다. 잠시 후 다시 시도하세요.")
         LoginFailureReason.DORMANT -> DisabledException("휴면 계정입니다. 관리자에게 문의하세요.")
+        LoginFailureReason.RATE_LIMITED -> LoginThrottledException("로그인 시도가 너무 많습니다. 잠시 후 다시 시도하세요.")
     }
+
+    /** 시도 횟수 제한. 계정 상태와 무관하므로 계정 존재 여부를 드러내지 않는다. */
+    class LoginThrottledException(message: String) : AuthenticationException(message)
 
     companion object {
         private const val UNKNOWN_IP = "unknown"

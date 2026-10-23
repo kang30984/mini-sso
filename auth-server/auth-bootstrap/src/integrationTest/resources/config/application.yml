@@ -1,4 +1,7 @@
 # 통합 테스트 전용 설정 (classpath:config/application.yml은 기본 application.yml보다 우선한다)
 minisso:
+  login:
+    # 통합 테스트는 같은 IP(127.0.0.1)로 여러 번 로그인하므로 제한을 넉넉히 둔다. 제한 자체는 단위·Redis 테스트에서 검증한다.
+    max-attempts-per-ip: 10000
   signing-key:
     encryption-key: KotKMvmve6ddAuIG68bfUKPIjCR6PW2mK52LOqFAneA=   # 테스트 전용

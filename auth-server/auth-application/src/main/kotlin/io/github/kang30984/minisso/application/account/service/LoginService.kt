@@ -4,6 +4,7 @@ import io.github.kang30984.minisso.application.account.port.inbound.Authenticati
 import io.github.kang30984.minisso.application.account.port.inbound.LoginCommand
 import io.github.kang30984.minisso.application.account.port.inbound.LoginUseCase
 import io.github.kang30984.minisso.application.account.port.outbound.LoadAccountPort
+import io.github.kang30984.minisso.application.account.port.outbound.LoginRateLimitPort
 import io.github.kang30984.minisso.application.account.port.outbound.SaveAccountPort
 import io.github.kang30984.minisso.application.history.port.outbound.SaveLoginHistoryPort
 import io.github.kang30984.minisso.domain.account.Account
@@ -32,12 +33,20 @@ class LoginService(
     private val passwordHasher: PasswordHasher,
     private val accountPolicy: AccountPolicy,
     private val clock: Clock,
+    private val loginRateLimitPort: LoginRateLimitPort = LoginRateLimitPort.UNLIMITED,
+    private val throttlePolicy: LoginThrottlePolicy = LoginThrottlePolicy(),
 ) : LoginUseCase {
 
     // 존재하지 않는 계정에도 실제 해시 비교를 수행해, 응답 시간 차이로 계정 존재 여부를 추측할 수 없게 한다.
     private val timingEqualizerHash: PasswordHash = passwordHasher.hash("timing-equalizer-Passw0rd!")
 
     override fun login(command: LoginCommand): AuthenticationResult {
+        // 비밀번호 비교(Argon2)보다 먼저 검사해, 차단된 요청이 CPU를 쓰지 않게 한다.
+        // 차단된 시도는 이력에 남기지 않는다. 공격 중에는 차단 건수만큼 DB 쓰기가 늘어나기 때문이다.
+        if (!loginRateLimitPort.tryAcquire("ip:${command.ip}", throttlePolicy.maxAttemptsPerIp, throttlePolicy.window)) {
+            return AuthenticationResult.Failed(LoginFailureReason.RATE_LIMITED)
+        }
+
         val now = clock.instant()
         val account = LoginId.parseOrNull(command.loginId)?.let(loadAccountPort::findByLoginId)
 

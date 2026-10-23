@@ -102,7 +102,7 @@ docker compose up -d                                                          # 
 - [x] 3주차: Spring Authorization Server 연동, Authorization Code + PKCE, OIDC
 - [x] 4주차: Redis SSO 세션, Refresh Token 회전·재사용 탐지, 로그아웃
 - [x] 5주차: SDK core·starter, 서명키 로테이션, 샘플 앱 2개
-- [ ] 6주차: k6 부하 테스트와 성능 개선, 문서 정리
+- [ ] 6주차: k6 부하 테스트와 성능 개선, 문서 정리 (로그인 시도 제한, 부하 테스트 환경, 트러블슈팅 문서 완료 / 측정·개선 진행 중)
 
 ## 구현 하이라이트
 
@@ -129,6 +129,7 @@ docker compose up -d                                                          # 
 - 리다이렉트 URI 등록 정책: 절대 URI만, 와일드카드·fragment·사용자 정보 금지, http는 로컬 주소만 허용
 - 토큰의 `sub`는 변하지 않는 계정 ID. ID 토큰에는 화면 표시용 프로필, 액세스 토큰에는 인가용 `roles`만 담아 개인정보 노출을 최소화
 - 로그인 실패 메시지는 "없는 계정 / 탈퇴 / 비밀번호 오류"를 구분하지 않음. 잠금·휴면만 사용자 조치가 필요해 구분
+- IP당 로그인 시도 제한(분당 20회, Redis 고정 윈도). Argon2 비교 전에 검사해 차단된 요청이 CPU를 쓰지 않으며, 차단 건은 이력에 쓰지 않아 공격 중 DB 쓰기 증폭을 막음
 - 관리자 API는 이 서버가 발급한 JWT의 `ADMIN` 권한으로 보호. 최초 관리자는 기동 설정으로만 생성
 - 인가 코드 + PKCE 전체 흐름(인가 요청 → 로그인 → 코드 → 토큰 교환 → 클레임 검증)을 통합 테스트로 재현해 CI에서 매번 검증
 
@@ -206,6 +207,12 @@ fun me(@CurrentUser user: AuthUser) = mapOf("accountId" to user.accountId())
 fun teamReports(@CurrentUser user: AuthUser) = ...
 ```
 
-## 성능 측정
+## 성능
 
-> 6주차에 측정 환경과 함께 p95 응답시간, TPS를 기록합니다.
+k6 시나리오 4개(로그인 전체 흐름, 토큰 갱신, SDK로 보호되는 API, 기준선)를 GitHub Actions에서 같은 환경으로 실행합니다. 실행 방법은 [load-test/README.md](load-test/README.md)를 참고하세요.
+
+> 측정 결과와 병목 분석, 개선 전후 비교를 정리하는 중입니다.
+
+## 트러블슈팅
+
+CI에서 실제로 겪은 문제 7건의 원인과 해결 과정을 [docs/troubleshooting.md](docs/troubleshooting.md)에 정리했습니다. 예: 테스트가 엉뚱한 이유로 통과하던 문제, 규격 권장 사항과 라이브러리 호환성이 충돌한 문제.

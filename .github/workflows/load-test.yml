@@ -1,0 +1,89 @@
+# 부하 테스트. Actions 탭에서 "Load Test" -> "Run workflow"로 수동 실행한다.
+# GitHub 호스티드 러너(ubuntu-latest) 한 대에서 MySQL, Redis, 인증 서버, 샘플 앱 B, k6를 모두 실행하므로
+# 절대 수치보다는 "같은 환경에서 변경 전후 비교"에 의미가 있다.
+name: Load Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      vus:
+        description: "동시 가상 사용자 수 (JWKS·API 시나리오는 이 값의 2.5배)"
+        default: "20"
+      duration:
+        description: "시나리오별 측정 시간"
+        default: "60s"
+
+jobs:
+  load-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      MINISSO_ISSUER_URI: http://localhost:9000
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v5
+      - run: chmod +x gradlew
+
+      - name: Build
+        run: ./gradlew :auth-server:auth-bootstrap:bootJar :samples:sample-app-b:bootJar
+
+      - name: Start MySQL, Redis
+        run: docker compose up -d --wait
+
+      - name: Start auth server and sample app B
+        run: |
+          AUTH_JAR=$(ls auth-server/auth-bootstrap/build/libs/*.jar | grep -v plain)
+          APP_B_JAR=$(ls samples/sample-app-b/build/libs/*.jar | grep -v plain)
+          nohup java -Xms512m -Xmx1g -jar "$AUTH_JAR" --spring.profiles.active=local,loadtest > auth-server.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf localhost:9000/actuator/health && break; sleep 2; done
+          nohup java -Xms256m -Xmx512m -jar "$APP_B_JAR" > sample-app-b.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf 127.0.0.1:8082/api/public/status && break; sleep 2; done
+
+      - name: Record environment
+        run: |
+          {
+            echo "## 부하 테스트 결과"
+            echo ""
+            echo "- 커밋: \`${GITHUB_SHA::7}\`"
+            echo "- 러너: $(nproc) vCPU, $(free -g | awk '/Mem:/{print $2}')GB RAM (GitHub ubuntu-latest, 모든 구성요소가 한 대에서 실행)"
+            echo "- JVM: $(java -version 2>&1 | head -1)"
+            echo "- 설정: VUs=${{ inputs.vus }}, 측정 시간=${{ inputs.duration }}"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run k6 scenarios
+        env:
+          VUS: ${{ inputs.vus }}
+          DURATION: ${{ inputs.duration }}
+        run: |
+          mkdir -p load-test/results
+          run() {
+            docker run --rm --network host --user "$(id -u):$(id -g)" \
+              -v "$PWD/load-test:/work" -w /work -e VUS="$2" -e DURATION \
+              grafana/k6:0.54.0 run "scenarios/$1.js" || echo "::warning::$1 임계치 미달"
+          }
+          run jwks $(( VUS * 5 / 2 ))
+          run login-flow "$VUS"
+          run token-refresh "$VUS"
+          run resource-api $(( VUS * 5 / 2 ))
+          cat load-test/results/*.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Collect server metrics
+        if: always()
+        run: |
+          for m in jvm.memory.used process.cpu.usage hikaricp.connections.active; do
+            curl -s "localhost:9000/actuator/metrics/$m" > "load-test/results/metric-$m.json" || true
+          done
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: load-test-results
+          path: |
+            load-test/results/
+            auth-server.log
+            sample-app-b.log

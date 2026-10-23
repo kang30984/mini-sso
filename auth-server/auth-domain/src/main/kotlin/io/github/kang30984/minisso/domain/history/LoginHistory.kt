@@ -16,6 +16,9 @@ enum class LoginFailureReason {
     DORMANT,
     WITHDRAWN,
     UNKNOWN_ACCOUNT,
+
+    /** 같은 IP의 시도가 너무 많아 비밀번호를 확인하지 않고 거부함 */
+    RATE_LIMITED,
     ;
 
     companion object {

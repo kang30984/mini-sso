@@ -268,7 +268,7 @@ erDiagram
 | `minisso:authz:idx:{type}:{sha256(token)}` | String | 해당 토큰 만료 | 토큰 → 인가 ID 역색인 (code, access, refresh, id_token, state) |
 | `minisso:authz:rotated:{sha256(token)}` | String | 이전 리프레시 토큰의 남은 수명 | 회전된 리프레시 토큰 (재사용 탐지, ADR-007) |
 | `minisso:sso:{sid}` | Set | 인가와 동일 | SSO 세션으로 발급된 인가 ID 목록 (로그아웃 시 일괄 폐기) |
-| `ratelimit:login:ip:{ip}` | String(INCR) | 1분 | 로그인 시도 제한 (6주차) |
+| `minisso:ratelimit:login:ip:{ip}:{윈도 번호}` | String(INCR) | 1분 | IP당 로그인 시도 제한 (고정 윈도) |
 
 원칙
 - 토큰 원문은 저장하지 않고 SHA-256 해시를 키로 쓴다.

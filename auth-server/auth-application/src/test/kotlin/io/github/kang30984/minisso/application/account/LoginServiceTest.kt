@@ -85,6 +85,35 @@ class LoginServiceTest {
         assertThat(result).isEqualTo(AuthenticationResult.Failed(LoginFailureReason.UNKNOWN_ACCOUNT))
     }
 
+    @Test
+    fun `같은 IP의 시도가 한도를 넘으면 비밀번호를 확인하지 않고 거부한다`() {
+        val limited = LoginService(
+            accounts, accounts, histories, hasher, policy, clock,
+            loginRateLimitPort = CountingRateLimiter(),
+            throttlePolicy = io.github.kang30984.minisso.application.account.service.LoginThrottlePolicy(maxAttemptsPerIp = 2),
+        )
+        limited.login(command(password = "wrong"))
+        limited.login(command(password = "wrong"))
+        val matchCountBefore = hasher.matchCount
+        val historyCountBefore = histories.histories.size
+
+        val result = limited.login(command(password = AccountFixture.PASSWORD))
+
+        assertThat(result).isEqualTo(AuthenticationResult.Failed(LoginFailureReason.RATE_LIMITED))
+        assertThat(hasher.matchCount).isEqualTo(matchCountBefore)
+        assertThat(histories.histories).hasSize(historyCountBefore)
+    }
+
+    private class CountingRateLimiter : io.github.kang30984.minisso.application.account.port.outbound.LoginRateLimitPort {
+        private val counts = mutableMapOf<String, Int>()
+
+        override fun tryAcquire(key: String, limit: Int, window: java.time.Duration): Boolean {
+            val count = (counts[key] ?: 0) + 1
+            counts[key] = count
+            return count <= limit
+        }
+    }
+
     private fun command(loginId: String = AccountFixture.LOGIN_ID, password: String) = LoginCommand(
         loginId = loginId,
         password = password,

@@ -1,10 +1,12 @@
 package io.github.kang30984.minisso.config
 
 import io.github.kang30984.minisso.application.account.port.outbound.LoadAccountPort
+import io.github.kang30984.minisso.application.account.port.outbound.LoginRateLimitPort
 import io.github.kang30984.minisso.application.account.port.outbound.SaveAccountPort
 import io.github.kang30984.minisso.application.account.service.AccountCommandService
 import io.github.kang30984.minisso.application.account.service.AccountQueryService
 import io.github.kang30984.minisso.application.account.service.LoginService
+import io.github.kang30984.minisso.application.account.service.LoginThrottlePolicy
 import io.github.kang30984.minisso.application.client.port.outbound.LoadOAuthClientPort
 import io.github.kang30984.minisso.application.client.port.outbound.SaveOAuthClientPort
 import io.github.kang30984.minisso.application.client.service.OAuthClientService
@@ -58,7 +60,13 @@ class ApplicationServiceConfig {
         passwordHasher: PasswordHasher,
         accountPolicy: AccountPolicy,
         clock: Clock,
-    ) = LoginService(loadAccountPort, saveAccountPort, saveLoginHistoryPort, passwordHasher, accountPolicy, clock)
+        loginRateLimitPort: LoginRateLimitPort,
+        @Value("\${minisso.login.max-attempts-per-ip:20}") maxAttemptsPerIp: Int,
+        @Value("\${minisso.login.rate-limit-window:1m}") rateLimitWindow: Duration,
+    ) = LoginService(
+        loadAccountPort, saveAccountPort, saveLoginHistoryPort, passwordHasher, accountPolicy, clock,
+        loginRateLimitPort, LoginThrottlePolicy(maxAttemptsPerIp, rateLimitWindow),
+    )
 
     @Bean
     fun accountQueryService(loadAccountPort: LoadAccountPort, clock: Clock) =

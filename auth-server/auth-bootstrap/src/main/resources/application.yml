@@ -38,6 +38,10 @@ minisso:
     retention: 1h
     # 인스턴스별 서명 키 캐시. 다른 인스턴스의 키 교체가 반영되는 최대 지연이다.
     cache-ttl: 30s
+  login:
+    # IP당 로그인 시도 제한 (credential stuffing, Argon2 CPU 고갈 공격 방어)
+    max-attempts-per-ip: 20
+    rate-limit-window: 1m
   account:
     max-failed-attempts: 5
     lock-duration: 30m
