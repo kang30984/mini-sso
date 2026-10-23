@@ -128,6 +128,8 @@ export function createLoadTestUsers() {
     }), {
       headers: { Authorization: `Bearer ${adminToken}`, 'Content-Type': 'application/json' },
       tags: { name: 'setup_create_user' },
+      // 앞 시나리오가 이미 만든 계정이면 409. 정상 응답이므로 실패율에 넣지 않는다
+      responseCallback: http.expectedStatuses(201, 409),
     });
     if (res.status !== 201 && res.status !== 409) fail(`create ${loginId}: ${res.status} ${res.body}`);
   }
