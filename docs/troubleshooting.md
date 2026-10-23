@@ -1,59 +1,71 @@
 # 트러블슈팅 기록
 
-CI와 부하 테스트에서 실제로 실패했던 문제와 원인, 해결 방법을 정리했다. 모두 "로컬에서 우연히 통과하던 것"이 모듈 분리나 엄격한 테스트로 드러난 경우다.
+CI와 부하 테스트에서 실제로 막혔던 문제들이다. 돌아보면 대부분 "로컬이나 특정 조건에서는 우연히 통과하던 것"이 모듈을 나누거나 테스트를 엄격하게 바꾸면서 드러난 경우였다.
 
-## 1. 사용자 정의 테스트 스위트가 모듈 의존성을 못 봄
+## 1. 직접 만든 테스트 스위트에서 모듈 의존성이 안 보임
 
-- **증상**: `integrationTest` 컴파일 시 같은 모듈의 도메인·애플리케이션 클래스를 찾지 못함
-- **원인**: Gradle의 기본 `test`는 `implementation` 의존성을 상속하지만, `JvmTestSuite`로 만든 스위트는 상속하지 않는다
-- **해결**: Convention Plugin에서 `integrationTestImplementation`이 `testImplementation`을 상속하도록 설정 (`minisso.integration-test-conventions`)
-- **교훈**: 공통 빌드 설정을 Convention Plugin 한 곳에 모아 두어, 한 번 고치면 모든 모듈에 반영됐다
+통합 테스트용으로 `integrationTest` 스위트를 따로 만들었는데, 컴파일할 때 같은 모듈의 도메인·애플리케이션 클래스를 찾지 못했다.
 
-## 2. 앱 전체에서는 되는데 모듈 단독 테스트에서만 실패 (kotlin-reflect)
+Gradle의 기본 `test`는 `implementation` 의존성을 물려받지만, `JvmTestSuite`로 새로 만든 스위트는 물려받지 않는다. 그래서 Convention Plugin에서 `integrationTestImplementation`이 `testImplementation`을 상속하도록 설정했다(`minisso.integration-test-conventions`).
 
-- **증상**: 영속성 모듈 통합 테스트에서 Spring Data가 `NoClassDefFoundError`
-- **원인**: Spring Data는 Kotlin 엔티티 생성자를 분석할 때 `kotlin-reflect`가 필요하다. 앱 전체를 띄우면 웹 모듈의 `jackson-module-kotlin`이 이를 우연히 가져와 문제가 가려져 있었다
-- **해결**: JPA 모듈 규약에 `kotlin-reflect`를 명시
-- **교훈**: 모듈을 단독으로 테스트하면 숨은 전이 의존성이 드러난다. 멀티모듈의 효용을 확인한 사례
+공통 빌드 설정을 Convention Plugin 한곳에 모아 둔 덕분에, 한 번 고치니 모든 모듈에 같이 반영됐다.
+
+## 2. 앱 전체로는 되는데 모듈 단독 테스트에서만 실패 (kotlin-reflect)
+
+영속성 모듈의 통합 테스트에서 Spring Data가 `NoClassDefFoundError`를 냈다. 이상한 건 앱 전체를 띄우는 테스트에서는 같은 코드가 잘 돌았다는 점이다.
+
+Spring Data는 Kotlin 엔티티의 생성자를 분석할 때 `kotlin-reflect`를 쓴다. 앱 전체를 띄우면 웹 모듈의 `jackson-module-kotlin`이 이걸 같이 가져와서 문제가 가려져 있었고, 영속성 모듈만 따로 띄우니 비로소 드러났다. JPA 모듈 규약에 `kotlin-reflect`를 명시해서 해결했다.
+
+모듈을 나눠서 따로 테스트하지 않았다면, 나중에 웹 모듈 의존성을 정리하다가 엉뚱한 곳이 깨졌을 것이다.
 
 ## 3. Kotlin 주석 안의 `/**`
 
-- **증상**: `Syntax error: Unclosed comment`
-- **원인**: Kotlin은 주석 중첩을 허용한다. KDoc에 경로를 `/api/admin/**`라고 적자 `/**`가 새 주석의 시작으로 해석됐다 (Java에서는 문제없는 표현)
-- **해결**: 주석 문구 변경, 전체 소스에서 같은 패턴 검색
+`Syntax error: Unclosed comment`라는 컴파일 오류가 났다. KDoc 주석에 경로를 `/api/admin/**`라고 적어 둔 게 원인이었다. Kotlin은 주석 안에 주석을 중첩할 수 있어서, 주석 속의 `/**`를 새 주석의 시작으로 읽었다. Java에서는 아무 문제 없는 표현이다.
 
-## 4. 테스트가 엉뚱한 이유로 통과하고 있었음 (인가 요청 파라미터)
+주석 문구를 바꾸고, 전체 소스에서 같은 패턴이 있는지 검색해 봤다.
 
-- **증상**: 인가 코드 흐름 테스트 일부가 실패하고, 실패하지 않은 테스트도 의심스러움
-- **원인**: Spring Authorization Server는 GET 인가 요청의 파라미터를 **쿼리 스트링에서만** 읽는다. MockMvc `param()`은 서블릿 파라미터로만 넣어 서버가 "파라미터 없는 요청(400)"으로 처리했다. 그 결과 "PKCE 누락 시 거부", "미등록 redirect_uri 거부" 테스트는 기대한 이유가 아니라 파라미터 누락으로 400이 나서 통과하고 있었다
-- **해결**: 쿼리 스트링이 포함된 URI로 요청하도록 수정하고, PKCE 누락 테스트의 기대값을 "400 또는 error"에서 "302 + `error=invalid_request` + 코드 없음"으로 좁힘
-- **교훈**: 실패 조건을 느슨하게 쓰면 잘못된 이유로 통과하는 테스트가 생긴다. 보안 테스트일수록 기대값을 정확하게 쓴다
+## 4. 테스트가 엉뚱한 이유로 통과하고 있었음
 
-## 5. 규격 권장 사항과 생태계 호환성의 충돌 (Logout Token `typ`)
+인가 코드 흐름 테스트 일부가 실패해서 원인을 찾다 보니, 통과하던 테스트도 믿을 수 없는 상태였다.
 
-- **증상**: Back-Channel Logout Token 검증 테스트에서 `BadJOSEException`
-- **원인**: OIDC Back-Channel Logout 규격은 `typ: logout+jwt` 헤더를 권장(SHOULD)한다. 그러나 Nimbus 기반 디코더(Spring Security 포함)는 기본 설정에서 `typ`이 `JWT`이거나 없을 때만 허용한다
-- **선택지**: 테스트 디코더만 설정을 바꿔 통과시키기 / 토큰에서 `typ` 제거
-- **해결**: `typ`을 넣지 않음. 테스트만 고치면 실제 서비스(Spring Security 클라이언트)가 로그아웃 토큰을 거부하게 된다. 권장 사항이므로 생략해도 규격 위반은 아니며, Logout Token임은 필수 클레임 `events`로 구분된다
-- **교훈**: 테스트를 통과시키는 것이 목적이 아니라, 테스트가 드러낸 실제 연동 문제를 고치는 것이 목적이다
+Spring Authorization Server는 GET 인가 요청의 파라미터를 쿼리 스트링에서만 읽는다. 그런데 MockMvc의 `param()`은 값을 서블릿 파라미터로만 넣고 쿼리 스트링에는 넣지 않는다. 서버 입장에서는 파라미터가 하나도 없는 요청이라 400을 돌려줬다.
+
+그 결과 "PKCE 없이 요청하면 거부한다", "등록되지 않은 redirect_uri는 거부한다" 테스트가 기대한 이유가 아니라 그냥 파라미터가 없어서 400이 나는 바람에 통과하고 있었다.
+
+요청을 쿼리 스트링이 들어간 URI로 보내도록 고쳤다. 그리고 PKCE 누락 테스트의 기대값도 "400이거나 error가 있으면 통과"에서 "302로 돌아가고, `error=invalid_request`가 있고, 코드는 없어야 통과"로 좁혔다.
+
+실패 조건을 느슨하게 쓰면 잘못된 이유로 통과하는 테스트가 생긴다. 보안 관련 테스트일수록 기대값을 정확하게 써야 한다는 걸 이때 느꼈다.
+
+## 5. 규격대로 했더니 라이브러리가 토큰을 거부함 (Logout Token `typ`)
+
+Back-Channel Logout 토큰을 검증하는 테스트에서 `BadJOSEException`이 났다.
+
+OIDC Back-Channel Logout 규격은 토큰 헤더에 `typ: logout+jwt`를 넣도록 권장(SHOULD)한다. 그런데 Nimbus 기반 디코더는 기본 설정에서 `typ`이 `JWT`이거나 아예 없을 때만 받아들인다. Spring Security도 이 디코더를 쓴다.
+
+테스트용 디코더 설정만 바꾸면 테스트는 통과시킬 수 있었다. 하지만 그러면 실제로 토큰을 받는 서비스(Spring Security 클라이언트)는 그대로 거부하게 된다. 그래서 토큰에서 `typ`을 빼는 쪽을 택했다. 권장 사항이라 빼도 규격 위반은 아니고, Logout Token인지는 필수 클레임인 `events`로 구분할 수 있다.
 
 ## 6. Java 불변 컬렉션의 `contains(null)`
 
-- **증상**: SDK 검증기를 만들 때 `NullPointerException` (`ImmutableCollections`)
-- **원인**: 설정 객체가 audience 목록을 `Set.copyOf`로 불변 보관했고, 이를 Nimbus 클레임 검증기에 그대로 넘겼다. Nimbus는 내부에서 `contains(null)`을 호출하는데, `Set.of`/`Set.copyOf`로 만든 불변 Set은 이때 `false`가 아니라 NPE를 던진다
-- **해결**: 외부 라이브러리에 넘길 때만 `HashSet`으로 복사
-- **교훈**: 불변 컬렉션은 내부 보관용으로는 안전하지만, 외부 API에 넘길 때는 그 API의 사용 방식(여기서는 null 조회)을 확인해야 한다
+SDK 검증기를 만드는 순간 `NullPointerException`이 났다. 스택에는 `ImmutableCollections`가 찍혀 있었다.
+
+설정 객체가 허용할 audience 목록을 `Set.copyOf`로 불변 Set으로 들고 있었고, 그걸 Nimbus의 클레임 검증기에 그대로 넘겼다. Nimbus는 내부에서 `contains(null)`을 호출하는데, `Set.of`나 `Set.copyOf`로 만든 불변 Set은 이때 `false`를 돌려주지 않고 NPE를 던진다. 일반 `HashSet`과 다르게 동작하는 부분이라 미처 몰랐다.
+
+외부 라이브러리에 넘길 때만 `HashSet`으로 복사해서 넘기도록 고쳤다. 불변 컬렉션은 안에서 들고 있기에는 안전하지만, 밖으로 넘길 때는 받는 쪽이 어떻게 쓰는지 확인해야 한다.
 
 ## 7. BOM이 관리하지 않는 라이브러리
 
-- **증상**: `Could not find com.nimbusds:nimbus-jose-jwt:.` (버전 비어 있음)
-- **원인**: Spring Boot BOM이 관리할 것으로 가정하고 버전 없이 선언했다. 다른 모듈은 Spring Security가 버전과 함께 가져와 문제가 없었다
-- **해결**: 버전 카탈로그에 버전을 명시. Spring Security가 더 높은 버전을 가져오면 Gradle 충돌 해결로 높은 쪽이 선택된다
+`Could not find com.nimbusds:nimbus-jose-jwt:.`라는 오류가 났다. 콜론 뒤가 비어 있는 게 버전이 없다는 뜻이다.
 
-## 8. 부하 테스트에서 드러난 동시 로그인 충돌 (500 오류)
+Spring Boot BOM이 버전을 관리해 줄 거라고 생각하고 버전 없이 선언했는데, 이 라이브러리는 BOM 관리 대상이 아니었다. 다른 모듈에서는 Spring Security가 버전과 함께 가져오니까 문제가 없었고, 직접 선언한 두 모듈에서만 터졌다. 버전 카탈로그에 버전을 명시해서 해결했다. Spring Security가 더 높은 버전을 가져오면 Gradle이 알아서 높은 쪽으로 맞춘다.
 
-- **증상**: 첫 부하 테스트에서 로그인 흐름 요청의 26%가 실패. 서버 로그에 `ObjectOptimisticLockingFailureException` 1,447건, 모두 같은 계정 엔티티
-- **원인**: 로그인 성공 시 `lastLoginAt`을 갱신하는데 계정 엔티티에 `@Version`이 있어, 같은 계정의 동시 로그인끼리 충돌했다. 이 예외가 인증 실패로 처리되지 않고 500으로 노출됐다
-- **해결**: 충돌 원인인 `lastLoginAt`·`updatedAt`을 낙관적 락 대상에서 제외하고, 보안 규칙인 실패 횟수 충돌은 트랜잭션 밖에서 1회 재시도. 회귀 테스트 `ConcurrentLoginIT` 추가 ([ADR-011](adr/011-concurrent-login-optimistic-lock.md))
-- **시나리오도 수정**: 모든 가상 사용자가 계정 하나로 로그인하던 것을 계정 100개로 나눴다. 실제와 다른 경합이 측정을 왜곡하기 때문이다
-- **교훈**: 단위·통합 테스트는 순차 실행이라 동시성 문제를 잡지 못했다. 부하 테스트가 성능 측정 도구이면서 동시성 버그 탐지 도구 역할을 했다
+## 8. 부하 테스트에서 드러난 동시 로그인 충돌
+
+첫 부하 테스트에서 로그인 요청의 26%가 실패했다. 서버 로그에 `ObjectOptimisticLockingFailureException`이 1,447건 있었고, 전부 같은 계정 엔티티였다.
+
+로그인에 성공할 때마다 `lastLoginAt`을 갱신하는데, 계정 엔티티에 `@Version`이 걸려 있어서 같은 계정의 동시 로그인끼리 충돌했다. 이 예외가 인증 실패로 처리되지 않고 500으로 나가고 있었다.
+
+충돌 원인인 `lastLoginAt`과 `updatedAt`은 낙관적 락 대상에서 빼고, 실패 횟수처럼 보안에 필요한 값의 충돌만 트랜잭션 바깥에서 한 번 재시도하게 했다. 같은 상황을 재현하는 `ConcurrentLoginIT`도 추가했다 ([ADR-011](adr/011-concurrent-login-optimistic-lock.md)).
+
+부하 테스트 시나리오도 같이 고쳤다. 가상 사용자 전원이 계정 하나로 로그인하던 걸 계정 100개로 나눴다. 실제로는 없는 경합이 측정 결과를 흐리기 때문이다.
+
+단위 테스트와 통합 테스트는 순서대로 하나씩 돌기 때문에 이런 동시성 문제를 잡지 못했다. 성능을 재려고 돌린 부하 테스트가 결과적으로 동시성 버그를 찾아 준 셈이다.
